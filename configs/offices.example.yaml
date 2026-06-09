@@ -1,0 +1,10 @@
+offices:
+  - id: local-dev-office
+    name: Local Dev Office
+    primary_node_id: hermes-local
+    secondary_node_ids:
+      - claude-code-local
+    default_project_id: local-agent-mesh
+    default_routing_policy_id: local-capability-match
+    default_permission_policy_id: local-safe-dev
+

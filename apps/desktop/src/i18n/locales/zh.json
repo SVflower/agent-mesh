@@ -1,0 +1,159 @@
+﻿{
+  "app": {
+    "title": "Agent Mesh",
+    "subtitle": "本地 Agent 办公室"
+  },
+  "nav": {
+    "offices": "办公室",
+    "agents": "Agent 资产",
+    "tasks": "任务",
+    "settings": "设置",
+    "chat": "Chat"
+  },
+  "topbar": {
+    "ready": "连接状态：已就绪",
+    "onlineCount": "在线 Runtime"
+  },
+  "actions": {
+    "createOffice": "创建办公室",
+    "createFirstOffice": "创建第一个办公室",
+    "refresh": "刷新",
+    "rescanBackground": "重新扫描",
+    "scanning": "扫描中",
+    "cancel": "取消",
+    "saveOffice": "保存办公室"
+  },
+  "init": {
+    "backgroundTitle": "正在检测本机 Agent Runtime",
+    "backgroundDescription": "当前阶段只检测 Hermes、OpenClaw、Codex、Claude Code 四个产品，并在创建办公室时提供选择。"
+  },
+  "offices": {
+    "title": "办公室控制台",
+    "description": "管理分布式 Agent 集群与协作环境",
+    "detectedAgents": "可用于创建办公室的 Agent"
+  },
+  "agents": {
+    "title": "Agent 资产",
+    "description": "当前只管理 Hermes、OpenClaw、Codex、Claude Code 四个产品。其他 Agent 仅作为未来迭代备忘。",
+    "catalogTitle": "本机 Agent 目录",
+    "runtimeTreeTitle": "Runtime 目录树",
+    "configTitle": "运行配置",
+    "skillsTitle": "Skills",
+    "mcpsTitle": "MCP",
+    "bestForTitle": "适合承担",
+    "healthPanelTitle": "健康状态",
+    "logPanelTitle": "实时日志摘要",
+    "officialSite": "官网",
+    "useInOffice": "加入办公室",
+    "scanFailedTitle": "本机扫描失败",
+    "notDetected": "尚未检测",
+    "notFound": "未发现",
+    "unknownVersion": "未知版本",
+    "command": "命令",
+    "path": "路径",
+    "version": "版本",
+    "health": "健康状态",
+    "connection": "连接方式",
+    "detectedAt": "检测时间"
+  },
+  "office": {
+    "emptyTitle": "还没有办公室",
+    "createdTitle": "已创建办公室",
+    "emptyDescription": "创建办公室后，才会产生属于这个团体的成员关系、会话记录和渠道路由。项目只是任务上下文，不需要作为一级菜单。",
+    "stepPrimary": "选择主 Agent，例如 Hermes，负责接收派发和管理入口",
+    "stepExecutors": "选择协作 Agent，例如 Claude Code、Codex、OpenClaw",
+    "stepChannels": "按需绑定 Agent Mesh Chat、飞书、CLI 等渠道",
+    "stepPermission": "选择默认权限、写入策略和人工确认规则",
+    "previewTitle": "办公室内部关系预览",
+    "previewDescription": "创建后，成员、会话、渠道会围绕办公室组织，而不是散落在全局菜单里。",
+    "nodesTitle": "成员",
+    "sessionsTitle": "会话",
+    "channelsTitle": "渠道",
+    "builderTitle": "创建办公室",
+    "builderDescription": "第一版先在本地内存中生成办公室预览，后续再接入持久化配置。",
+    "basicInfoTitle": "基础信息",
+    "nameLabel": "办公室名称",
+    "descriptionLabel": "说明",
+    "primaryMemberTitle": "选择主成员",
+    "collaboratorTitle": "选择协作成员",
+    "permissionTitle": "默认权限",
+    "generatedPreviewTitle": "生成预览",
+    "selected": "已选",
+    "optional": "可选",
+    "unnamedOffice": "未命名办公室",
+    "collaborators": "个协作成员",
+    "activePersonas": "活跃成员（Personas）",
+    "activeTasks": "活跃任务",
+    "lastActive": "最后活跃",
+    "createTileDescription": "配置专用 Runtime 与 Agent 角色，开启自动化协作流水线",
+    "recentActivity": "全域实时日志（Recent Activity）",
+    "timeColumn": "时间戳",
+    "officeColumn": "办公室",
+    "actionColumn": "动作"
+  },
+  "permission": {
+    "read-only": "只读",
+    "safe-write": "安全写入",
+    "full-access": "完全访问"
+  },
+  "permissionHint": {
+    "read-only": "只允许读取项目和状态，适合观察、总结和审查。",
+    "safe-write": "允许受控写入和测试，适合日常代码与文档任务。",
+    "full-access": "允许高权限操作，后续需要加入更强确认机制。"
+  },
+  "tasks": {
+    "title": "任务",
+    "description": "任务可以从渠道、主 Agent 或用户直接发起，并由办公室内具备能力和权限的 Agent 执行。",
+    "recentTitle": "最近任务",
+    "scopeTitle": "任务与办公室的关系",
+    "scopeDescription": "任务应该记录发起者、所属办公室、主 Agent、执行 Agent、会话、上下文和验收标准。",
+    "summaryColumn": "目标摘要",
+    "officeColumn": "办公室",
+    "executorColumn": "执行成员",
+    "durationColumn": "耗时",
+    "statusColumn": "状态",
+    "detailTitle": "任务详情",
+    "runtimeLogTitle": "运行时日志",
+    "memory": "内存占用",
+    "assignedAsset": "分配资产",
+    "stopTask": "停止任务",
+    "restartTask": "重启实例"
+  },
+  "settings": {
+    "title": "通用设置",
+    "description": "设置从侧边栏齿轮进入，不打断办公室工作流。",
+    "languageTitle": "界面语言",
+    "languageDescription": "切换后立即预览界面语言，并保存到本机。",
+    "themeTitle": "外观主题",
+    "themeDescription": "选择应用的外观主题，后续会接入系统主题。",
+    "homeAgentsTitle": "目标 Agent",
+    "homeAgentsDescription": "选择创建办公室时优先展示的四个目标 Agent。"
+  },
+  "role": {
+    "primary": "主 Agent",
+    "executor": "协作 Agent"
+  },
+  "status": {
+    "available": "可用",
+    "missing": "未发现",
+    "online": "在线",
+    "offline": "离线",
+    "completed": "完成",
+    "running": "运行中",
+    "degraded": "异常",
+    "unknown": "未知",
+    "failed": "失败",
+    "standby": "待命"
+  },
+  "theme": {
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
+  "language": {
+    "label": "语言",
+    "zh": "简体中文",
+    "en": "English",
+    "ja": "日本語"
+  }
+}

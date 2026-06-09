@@ -1,0 +1,14 @@
+routing_policies:
+  - id: local-capability-match
+    mode: capability_match
+    fallback_node_ids:
+      - claude-code-local
+
+permission_policies:
+  - id: local-safe-dev
+    default_mode: read-only
+    require_confirmation:
+      - file.delete
+      - secret.read
+      - deploy.run
+

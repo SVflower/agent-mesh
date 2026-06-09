@@ -1,0 +1,8 @@
+channels:
+  - id: feishu-local-dev
+    type: feishu
+    office_id: local-dev-office
+    primary_node_id: hermes-local
+    default_project_id: local-agent-mesh
+    permission_mode: read-only
+

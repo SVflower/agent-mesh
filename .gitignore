@@ -1,0 +1,36 @@
+# Dependencies and package manager artifacts
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+*.tgz
+target/
+
+# Desktop and Rust generated artifacts
+apps/desktop/src-tauri/target/
+apps/desktop/dist/
+
+# Local runtime data
+.agent-mesh/
+.hermes/
+output/
+*.log
+
+# Documentation and design drafts not included in the current code commit
+docs/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editor and system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

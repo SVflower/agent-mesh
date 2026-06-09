@@ -1,0 +1,18 @@
+[package]
+name = "agent-mesh-desktop"
+version = "0.1.0"
+description = "Agent Mesh desktop app"
+authors = ["Agent Mesh Contributors"]
+edition = "2021"
+
+[lib]
+name = "agent_mesh_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.2", features = [] }
+
+[dependencies]
+tauri = { version = "2.6.2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

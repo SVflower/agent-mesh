@@ -1,0 +1,6 @@
+projects:
+  - id: local-agent-mesh
+    name: Agent Mesh
+    root_path: D:\IDEA\workspace\agent-mesh
+    default_branch: main
+

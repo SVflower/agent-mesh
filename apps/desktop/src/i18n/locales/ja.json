@@ -1,0 +1,159 @@
+{
+  "app": {
+    "title": "Agent Mesh",
+    "subtitle": "Local Control Plane"
+  },
+  "nav": {
+    "offices": "Offices",
+    "agents": "Agent Assets",
+    "tasks": "Tasks",
+    "settings": "Settings",
+    "chat": "Chat"
+  },
+  "topbar": {
+    "ready": "Connection ready",
+    "onlineCount": "Online runtimes"
+  },
+  "actions": {
+    "createOffice": "Create office",
+    "createFirstOffice": "Create first office",
+    "refresh": "Refresh",
+    "rescanBackground": "Rescan",
+    "scanning": "Scanning",
+    "cancel": "Cancel",
+    "saveOffice": "Save office"
+  },
+  "init": {
+    "backgroundTitle": "Detecting local Agent runtimes",
+    "backgroundDescription": "This MVP only detects Hermes, OpenClaw, Codex, and Claude Code."
+  },
+  "offices": {
+    "title": "Office Console",
+    "description": "Manage distributed Agent clusters and collaboration workspaces.",
+    "detectedAgents": "Agents available for office creation"
+  },
+  "agents": {
+    "title": "Agent Assets",
+    "description": "Manage Hermes, OpenClaw, Codex, and Claude Code first.",
+    "catalogTitle": "Local agent catalog",
+    "runtimeTreeTitle": "Runtime tree",
+    "configTitle": "Runtime config",
+    "skillsTitle": "Skills",
+    "mcpsTitle": "MCP",
+    "bestForTitle": "Best for",
+    "healthPanelTitle": "Health status",
+    "logPanelTitle": "Live log summary",
+    "officialSite": "Official site",
+    "useInOffice": "Add to office",
+    "scanFailedTitle": "Local scan failed",
+    "notDetected": "Not scanned yet",
+    "notFound": "Not found",
+    "unknownVersion": "Unknown version",
+    "command": "Command",
+    "path": "Path",
+    "version": "Version",
+    "health": "Health",
+    "connection": "Connection",
+    "detectedAt": "Detected at"
+  },
+  "office": {
+    "emptyTitle": "No office yet",
+    "createdTitle": "Created offices",
+    "emptyDescription": "Create an office to organize members, sessions, and channels.",
+    "stepPrimary": "Choose a primary agent",
+    "stepExecutors": "Choose collaborators",
+    "stepChannels": "Bind channels",
+    "stepPermission": "Choose permission rules",
+    "previewTitle": "Office relationship preview",
+    "previewDescription": "Members, sessions, and channels are organized by office.",
+    "nodesTitle": "Members",
+    "sessionsTitle": "Sessions",
+    "channelsTitle": "Channels",
+    "builderTitle": "Create virtual office",
+    "builderDescription": "First version generates an in-memory office preview.",
+    "basicInfoTitle": "Basic info",
+    "nameLabel": "Office name",
+    "descriptionLabel": "Description",
+    "primaryMemberTitle": "Choose primary member",
+    "collaboratorTitle": "Choose collaborators",
+    "permissionTitle": "Default permission",
+    "generatedPreviewTitle": "Generated preview",
+    "selected": "Selected",
+    "optional": "Optional",
+    "unnamedOffice": "Unnamed office",
+    "collaborators": "collaborators",
+    "activePersonas": "Active members (Personas)",
+    "activeTasks": "Active tasks",
+    "lastActive": "Last active",
+    "createTileDescription": "Configure runtimes and agent roles for automated collaboration.",
+    "recentActivity": "Recent activity",
+    "timeColumn": "Timestamp",
+    "officeColumn": "Office",
+    "actionColumn": "Action"
+  },
+  "permission": {
+    "read-only": "Read only",
+    "safe-write": "Safe write",
+    "full-access": "Full access"
+  },
+  "permissionHint": {
+    "read-only": "Read-only observation mode.",
+    "safe-write": "Allow controlled edits and tests.",
+    "full-access": "Allow high-trust operations."
+  },
+  "tasks": {
+    "title": "Task Management",
+    "description": "Observe task execution, status, logs, and assigned agents.",
+    "recentTitle": "Recent tasks",
+    "scopeTitle": "How tasks relate to offices",
+    "scopeDescription": "A task records requester, office, primary agent, executor, session, context, and acceptance criteria.",
+    "summaryColumn": "Summary",
+    "officeColumn": "Office",
+    "executorColumn": "Executor",
+    "durationColumn": "Duration",
+    "statusColumn": "Status",
+    "detailTitle": "Task detail",
+    "runtimeLogTitle": "Runtime log",
+    "memory": "Memory",
+    "assignedAsset": "Assigned asset",
+    "stopTask": "Stop task",
+    "restartTask": "Restart instance"
+  },
+  "settings": {
+    "title": "General settings",
+    "description": "Settings live behind the sidebar gear.",
+    "languageTitle": "Interface language",
+    "languageDescription": "Preview the interface language immediately.",
+    "themeTitle": "Appearance theme",
+    "themeDescription": "Choose the app appearance.",
+    "homeAgentsTitle": "Common agents",
+    "homeAgentsDescription": "Choose priority agents for office creation."
+  },
+  "role": {
+    "primary": "Primary agent",
+    "executor": "Collaborator"
+  },
+  "status": {
+    "available": "available",
+    "missing": "missing",
+    "online": "online",
+    "offline": "offline",
+    "standby": "standby",
+    "completed": "completed",
+    "running": "running",
+    "degraded": "degraded",
+    "unknown": "unknown",
+    "failed": "failed"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "label": "Language",
+    "zh": "Simplified Chinese",
+    "en": "English",
+    "ja": "Japanese"
+  }
+}

@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "0.1",
+  "stateDir": ".agent-mesh",
+  "runtimes": {
+    "runtime_hermes": {
+      "id": "runtime_hermes",
+      "name": "Hermes",
+      "kind": "hermes",
+      "connection_type": "cli",
+      "command": "hermes",
+      "installed": false,
+      "health": "unknown",
+      "notes": "负责飞书、CLI 等外部渠道入口，以及与 Agent Mesh MCP/Skill 的任务派发。"
+    },
+    "runtime_openclaw": {
+      "id": "runtime_openclaw",
+      "name": "OpenClaw",
+      "kind": "openclaw",
+      "connection_type": "desktop",
+      "command": "openclaw",
+      "installed": false,
+      "health": "unknown",
+      "notes": "第一阶段先手动维护 Persona，后续再做 OpenClaw 内部多 Agent 自动发现。"
+    },
+    "runtime_claude_code": {
+      "id": "runtime_claude_code",
+      "name": "Claude Code",
+      "kind": "claude-code",
+      "connection_type": "cli",
+      "command": "claude",
+      "installed": false,
+      "health": "unknown",
+      "notes": "适合代码实现、仓库分析、审查与长任务执行。"
+    },
+    "runtime_codex": {
+      "id": "runtime_codex",
+      "name": "Codex",
+      "kind": "codex",
+      "connection_type": "cli",
+      "command": "codex",
+      "installed": false,
+      "health": "unknown",
+      "notes": "适合规划、代码修改、测试验证和文档整理。"
+    }
+  },
+  "personas": {
+    "persona_hermes_default": {
+      "id": "persona_hermes_default",
+      "runtime_id": "runtime_hermes",
+      "name": "default",
+      "profile_key": "default",
+      "description": "Hermes 默认身份，可作为办公室主入口和任务路由者。",
+      "capabilities": ["channel.cli", "task.request", "mcp.client"],
+      "skills": ["task.dispatch", "channel.route", "status.query"],
+      "mcp_bindings": ["mcp_agent_mesh"],
+      "enabled": true,
+      "source": "default"
+    },
+    "persona_hermes_feishu_primary": {
+      "id": "persona_hermes_feishu_primary",
+      "runtime_id": "runtime_hermes",
+      "name": "feishu-primary",
+      "profile_key": "feishu-primary",
+      "description": "面向飞书入口的 Hermes profile，用于接收远程任务和回传进度。",
+      "capabilities": ["channel.feishu", "task.request", "mcp.client"],
+      "skills": ["feishu.receive", "task.dispatch", "status.query"],
+      "mcp_bindings": ["mcp_agent_mesh"],
+      "enabled": true,
+      "source": "default"
+    },
+    "persona_openclaw_coco": {
+      "id": "persona_openclaw_coco",
+      "runtime_id": "runtime_openclaw",
+      "name": "CoCo",
+      "profile_key": "coco",
+      "description": "OpenClaw 内的代码助手 Persona，第一阶段手动配置。",
+      "capabilities": ["code.assist", "browser.operate", "ui.inspect"],
+      "skills": ["browser.operate", "ui.inspect", "workflow.automate"],
+      "mcp_bindings": [],
+      "enabled": true,
+      "source": "default"
+    },
+    "persona_openclaw_huajuan": {
+      "id": "persona_openclaw_huajuan",
+      "runtime_id": "runtime_openclaw",
+      "name": "花卷",
+      "profile_key": "huajuan",
+      "description": "OpenClaw 内的 AI 助手 Persona，适合网页操作、信息整理和流程自动化。",
+      "capabilities": ["assistant.general", "browser.operate", "workflow.automate"],
+      "skills": ["browser.operate", "workflow.automate", "summary.write"],
+      "mcp_bindings": [],
+      "enabled": true,
+      "source": "default"
+    },
+    "persona_claude_code_default": {
+      "id": "persona_claude_code_default",
+      "runtime_id": "runtime_claude_code",
+      "name": "default",
+      "profile_key": "default",
+      "description": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
+      "capabilities": ["code.implement", "code.review", "repo.inspect"],
+      "skills": ["code.implement", "code.review", "repo.inspect"],
+      "mcp_bindings": ["mcp_agent_mesh"],
+      "enabled": true,
+      "source": "default"
+    },
+    "persona_codex_default": {
+      "id": "persona_codex_default",
+      "runtime_id": "runtime_codex",
+      "name": "default",
+      "profile_key": "default",
+      "description": "Codex 默认身份，适合规划、编辑、测试和文档工作。",
+      "capabilities": ["code.edit", "code.review", "docs.write", "task.plan"],
+      "skills": ["code.edit", "test.run", "docs.write"],
+      "mcp_bindings": ["mcp_agent_mesh"],
+      "enabled": true,
+      "source": "default"
+    }
+  },
+  "offices": {
+    "office_local_dev": {
+      "id": "office_local_dev",
+      "name": "本地开发办公室",
+      "description": "用于本机代码、文档和长任务协作的默认办公室。",
+      "default_permission_policy_id": "policy_local_safe_dev",
+      "default_channel_id": "channel_cli_local",
+      "default_task_type_id": "task_type_code_implementation",
+      "default_routing_policy_id": "routing_local_code",
+      "default_workspace_path": ".",
+      "paused": false,
+      "created_at": "2026-06-09T00:00:00.000Z",
+      "updated_at": "2026-06-09T00:00:00.000Z"
+    }
+  },
+  "officeMembers": {
+    "member_local_hermes": {
+      "id": "member_local_hermes",
+      "office_id": "office_local_dev",
+      "persona_id": "persona_hermes_feishu_primary",
+      "role": "primary",
+      "office_title": "主入口与任务路由",
+      "responsibility": "接收飞书或 CLI 指令，派发给协作 Agent，并回传进度。",
+      "enabled": true
+    },
+    "member_local_claude": {
+      "id": "member_local_claude",
+      "office_id": "office_local_dev",
+      "persona_id": "persona_claude_code_default",
+      "role": "collaborator",
+      "office_title": "代码实现 Agent",
+      "responsibility": "执行代码实现、仓库分析和审查任务。",
+      "enabled": true
+    },
+    "member_local_codex": {
+      "id": "member_local_codex",
+      "office_id": "office_local_dev",
+      "persona_id": "persona_codex_default",
+      "role": "collaborator",
+      "office_title": "规划与验证 Agent",
+      "responsibility": "负责方案整理、代码修改、测试和文档更新。",
+      "enabled": true
+    }
+  },
+  "channels": {
+    "channel_cli_local": {
+      "id": "channel_cli_local",
+      "type": "cli",
+      "name": "本机 CLI",
+      "office_id": "office_local_dev",
+      "primary_member_id": "member_local_hermes",
+      "permission_policy_id": "policy_local_safe_dev",
+      "enabled": true
+    }
+  },
+  "skills": {
+    "skill_task_dispatch": {
+      "id": "skill_task_dispatch",
+      "name": "任务派发",
+      "description": "将任务边界、上下文、验收标准和结果格式发送给协作 Agent。",
+      "capabilities": ["task.dispatch"],
+      "runtime_kinds": ["hermes", "claude-code", "codex"]
+    },
+    "skill_observability": {
+      "id": "skill_observability",
+      "name": "任务观测",
+      "description": "读取任务状态、事件、日志尾部和诊断信息。",
+      "capabilities": ["task.status", "task.log.tail"],
+      "runtime_kinds": ["hermes", "claude-code", "codex"]
+    }
+  },
+  "mcpBindings": {
+    "mcp_agent_mesh": {
+      "id": "mcp_agent_mesh",
+      "name": "Agent Mesh MCP",
+      "server_name": "agent-mesh",
+      "tools": ["dispatch_claude_task", "query_task", "get_node_status", "get_agent_session_status"],
+      "enabled": true
+    }
+  },
+  "permissionPolicies": {
+    "policy_local_readonly": {
+      "id": "policy_local_readonly",
+      "name": "本地只读",
+      "default_mode": "read-only",
+      "require_confirmation": ["write_file", "run_destructive_command"],
+      "allowed_channels": ["cli", "feishu"],
+      "allowed_runtime_kinds": ["hermes", "openclaw", "codex", "claude-code"]
+    },
+    "policy_local_safe_dev": {
+      "id": "policy_local_safe_dev",
+      "name": "本地安全开发",
+      "default_mode": "safe-write",
+      "require_confirmation": ["run_destructive_command", "network_publish", "credential_access"],
+      "allowed_channels": ["agent-mesh-chat", "cli", "feishu"],
+      "allowed_runtime_kinds": ["hermes", "openclaw", "codex", "claude-code"]
+    }
+  },
+  "taskTypes": {
+    "task_type_code_implementation": {
+      "id": "task_type_code_implementation",
+      "name": "代码实现",
+      "description": "实现功能、修复问题、重构代码或补充测试。",
+      "required_capabilities": ["code.implement", "repo.inspect"],
+      "default_acceptance": ["说明修改内容", "列出验证命令与结果", "标明风险和后续建议"],
+      "default_constraints": ["保护用户未授权的改动", "优先使用项目现有技术栈"],
+      "enabled": true
+    },
+    "task_type_plan_docs": {
+      "id": "task_type_plan_docs",
+      "name": "规划与文档",
+      "description": "整理方案、PRD、路线图、开发日志和使用说明。",
+      "required_capabilities": ["docs.write", "task.plan"],
+      "default_acceptance": ["结构清晰", "术语与当前模型一致", "明确下一步行动"],
+      "default_constraints": ["默认简体中文", "避免扩大当前四产品范围"],
+      "enabled": true
+    },
+    "task_type_browser_automation": {
+      "id": "task_type_browser_automation",
+      "name": "浏览器自动化",
+      "description": "网页操作、UI 检查、资料收集和流程自动化。",
+      "required_capabilities": ["browser.operate", "ui.inspect"],
+      "default_acceptance": ["记录关键页面状态", "保留可复查证据", "说明失败原因"],
+      "default_constraints": ["避免处理敏感凭据", "需要用户确认后执行高风险操作"],
+      "enabled": true
+    }
+  },
+  "routingPolicies": {
+    "routing_local_code": {
+      "id": "routing_local_code",
+      "name": "本地代码任务优先",
+      "office_id": "office_local_dev",
+      "task_type_id": "task_type_code_implementation",
+      "strategy": "capability-match",
+      "fallback_member_id": "member_local_claude",
+      "preferred_member_ids": ["member_local_claude", "member_local_codex"],
+      "required_capabilities": ["code.implement", "repo.inspect"],
+      "enabled": true
+    },
+    "routing_local_docs": {
+      "id": "routing_local_docs",
+      "name": "规划文档任务优先",
+      "office_id": "office_local_dev",
+      "task_type_id": "task_type_plan_docs",
+      "strategy": "capability-match",
+      "fallback_member_id": "member_local_codex",
+      "preferred_member_ids": ["member_local_codex", "member_local_claude"],
+      "required_capabilities": ["docs.write", "task.plan"],
+      "enabled": true
+    },
+    "routing_local_browser": {
+      "id": "routing_local_browser",
+      "name": "浏览器任务优先",
+      "office_id": "office_local_dev",
+      "task_type_id": "task_type_browser_automation",
+      "strategy": "capability-match",
+      "fallback_member_id": "member_local_hermes",
+      "preferred_member_ids": ["member_local_hermes"],
+      "required_capabilities": ["browser.operate", "ui.inspect"],
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+agents:
+  - id: claude-code-local
+    name: Claude Code Local
+    type: claude-code
+    runtime: cli
+    role: executor
+    command: claude
+    capabilities:
+      - code.implement
+      - code.review
+      - repo.inspect
+    session_policy: resume
+
