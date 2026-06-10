@@ -138,11 +138,14 @@
     "missing": "未发现",
     "online": "在线",
     "offline": "离线",
+    "queued": "排队中",
+    "assigned": "已分配",
     "completed": "完成",
     "running": "运行中",
     "degraded": "异常",
     "unknown": "未知",
     "failed": "失败",
+    "cancelled": "已取消",
     "standby": "待命"
   },
   "theme": {

@@ -1,6 +1,6 @@
 export type RuntimeKind = 'hermes' | 'openclaw' | 'codex' | 'claude-code'
 
-export type RuntimeStatus = 'available' | 'missing' | 'unknown' | 'degraded' | 'online' | 'offline' | 'completed' | 'running' | 'failed' | 'standby'
+export type RuntimeStatus = 'available' | 'missing' | 'unknown' | 'degraded' | 'online' | 'offline' | 'standby' | 'queued' | 'assigned' | 'completed' | 'running' | 'failed' | 'cancelled'
 
 export type PermissionMode = 'read-only' | 'safe-write' | 'full-access'
 
@@ -39,6 +39,22 @@ export type RuntimeAdapterStatus = {
   cancel: AdapterCapabilityState
   session_status: AdapterCapabilityState
   notes: string
+}
+
+export type LocalAgentInventoryStatus = 'managed' | 'manual' | 'discovered' | 'unverified' | 'unavailable'
+
+export type LocalAgentInventoryItem = {
+  runtime_id: string
+  runtime_kind: RuntimeKind | string
+  runtime_name: string
+  persona_id?: string
+  name: string
+  profile_key?: string
+  description?: string
+  status: LocalAgentInventoryStatus
+  source: string
+  in_offices: string[]
+  diagnostic: string
 }
 
 export type Persona = {
@@ -186,4 +202,6 @@ export type SaveOfficePayload = {
   office: Office
   members: OfficeMember[]
   channel?: Channel
+  taskType?: TaskType
+  routingPolicy?: RoutingPolicy
 }

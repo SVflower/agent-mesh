@@ -3,11 +3,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { TASK_STATUSES, createEnvelope, transition, validateTask } from "./acp.js";
 import { clearClaudeSession, getClaudeSession, runClaudeTask } from "./agents/claude.js";
-import { loadConfig, getAgent } from "./config.js";
+import { loadConfig, getAgent, loadDesktopConfig } from "./config.js";
 import { appendTaskEvent } from "./observability.js";
 import { readTaskEvents, readTaskLogTail } from "./observability.js";
 import { listEnvelopes, loadEnvelope, saveEnvelope, taskStatePath } from "./state.js";
-import type { AcpTask, AgentConfig, AgentResult, DispatchInput, TaskEnvelope } from "./types.js";
+import type {
+  AcpTask,
+  AgentConfig,
+  AgentResult,
+  DesktopAgentMeshConfig,
+  DesktopOffice,
+  DesktopOfficeMember,
+  DesktopPersona,
+  DesktopRoutingPolicy,
+  DispatchInput,
+  OfficeDispatchInput,
+  TaskEnvelope
+} from "./types.js";
 
 export async function dispatchTask(input: DispatchInput) {
   const task = createTaskFromInput(input);
@@ -59,6 +71,95 @@ export async function dispatchTaskAsync(input: DispatchInput) {
     const failedStateFile = await saveEnvelope(config.stateDir, envelope);
     return summarizeEnvelope(envelope, failedStateFile);
   }
+}
+
+export async function dispatchOfficeTask(input: OfficeDispatchInput) {
+  const desktopConfig = await loadDesktopConfig();
+  const office = resolveOffice(desktopConfig, input.officeId ?? input.office);
+  const routingPolicy = resolveRoutingPolicy(desktopConfig, office);
+  const taskType = office.default_task_type_id
+    ? desktopConfig.taskTypes?.[office.default_task_type_id]
+    : undefined;
+  const policy = office.default_permission_policy_id
+    ? desktopConfig.permissionPolicies?.[office.default_permission_policy_id]
+    : undefined;
+  const member = selectOfficeExecutor(desktopConfig, office, routingPolicy);
+  const persona = desktopConfig.personas[member.persona_id];
+  const runtime = persona ? desktopConfig.runtimes[persona.runtime_id] : undefined;
+  const readOnly = input.readOnly ?? policy?.default_mode === "read-only";
+  const taskId = input.id ?? createOfficeTaskId(office.name);
+  const acceptance = input.acceptance?.length
+    ? input.acceptance
+    : taskType?.default_acceptance?.length
+      ? taskType.default_acceptance
+      : [
+        "用简体中文说明这个项目是做什么的",
+        "说明核心模块、入口和当前能力边界",
+        "只做阅读和总结，不修改任何文件"
+      ];
+  const constraints = readOnly
+    ? {
+      may_edit: [],
+      must_not_edit: ["**/*", "不要写入、删除、移动或格式化任何文件", "不要执行会改变工作区状态的命令"]
+    }
+    : {
+      may_edit: [],
+      must_not_edit: taskType?.default_constraints ?? []
+    };
+
+  const dispatchInput: DispatchInput = {
+    id: taskId,
+    objective: buildOfficeObjective(input.objective, office, member, persona),
+    agent: runtime?.kind === "claude-code" ? "claude-code" : "claude-code",
+    repo: input.repo ?? office.default_workspace_path ?? ".",
+    context: {
+      ...(input.context ?? {}),
+      channel: input.channel ?? office.default_channel_id,
+      office: {
+        id: office.id,
+        name: office.name,
+        description: office.description
+      },
+      member: {
+        id: member.id,
+        title: member.office_title,
+        responsibility: member.responsibility,
+        persona: persona?.name,
+        runtime: runtime?.kind
+      },
+      permission: {
+        mode: policy?.default_mode ?? (readOnly ? "read-only" : "safe-write"),
+        readOnly
+      }
+    },
+    constraints,
+    acceptance,
+    expected_output: {
+      format: "read_only_project_report",
+      include_tests: false,
+      include_changed_files: false
+    },
+    mode: input.mode ?? "async"
+  };
+
+  const result = dispatchInput.mode === "sync"
+    ? await dispatchTask(dispatchInput)
+    : await dispatchTaskAsync(dispatchInput);
+
+  return {
+    ...result,
+    office: {
+      id: office.id,
+      name: office.name
+    },
+    assignedMember: {
+      id: member.id,
+      title: member.office_title,
+      persona: persona?.name,
+      runtime: runtime?.kind
+    },
+    permissionMode: policy?.default_mode ?? (readOnly ? "read-only" : "safe-write")
+  };
 }
 
 export async function getTaskStatus(taskId: string) {
@@ -272,6 +373,78 @@ function createTaskFromInput(input: DispatchInput): AcpTask {
       include_tests: true
     }
   };
+}
+
+function resolveOffice(config: DesktopAgentMeshConfig, officeNameOrId?: string): DesktopOffice {
+  const offices = Object.values(config.offices).filter((office) => office.paused !== true);
+  const office = officeNameOrId
+    ? offices.find((candidate) => candidate.id === officeNameOrId || candidate.name === officeNameOrId)
+    : offices[0];
+
+  if (!office) {
+    const known = offices.map((candidate) => `${candidate.name} (${candidate.id})`).join(", ");
+    throw new Error(`Unknown office "${officeNameOrId ?? ""}". Known offices: ${known || "none"}.`);
+  }
+
+  return office;
+}
+
+function resolveRoutingPolicy(config: DesktopAgentMeshConfig, office: DesktopOffice): DesktopRoutingPolicy | undefined {
+  return office.default_routing_policy_id
+    ? config.routingPolicies?.[office.default_routing_policy_id]
+    : Object.values(config.routingPolicies ?? {}).find((policy) => policy.office_id === office.id && policy.enabled !== false);
+}
+
+function selectOfficeExecutor(
+  config: DesktopAgentMeshConfig,
+  office: DesktopOffice,
+  routingPolicy?: DesktopRoutingPolicy
+): DesktopOfficeMember {
+  const members = Object.values(config.officeMembers)
+    .filter((member) => member.office_id === office.id && member.enabled !== false);
+
+  if (members.length === 0) {
+    throw new Error(`Office "${office.name}" has no enabled members.`);
+  }
+
+  const preferred = routingPolicy?.preferred_member_ids
+    ?.map((memberId) => members.find((member) => member.id === memberId))
+    .find((member): member is DesktopOfficeMember => Boolean(member));
+  if (preferred) return preferred;
+
+  const claudeMember = members.find((member) => {
+    const persona = config.personas[member.persona_id];
+    const runtime = persona ? config.runtimes[persona.runtime_id] : undefined;
+    return runtime?.kind === "claude-code";
+  });
+  if (claudeMember) return claudeMember;
+
+  return members.find((member) => member.id === routingPolicy?.fallback_member_id)
+    ?? members.find((member) => member.role === "collaborator")
+    ?? members.find((member) => member.role === "primary")
+    ?? members[0];
+}
+
+function buildOfficeObjective(
+  objective: string,
+  office: DesktopOffice,
+  member: DesktopOfficeMember,
+  persona?: DesktopPersona
+): string {
+  return [
+    `你正在以「${office.name}」办公室成员身份执行任务。`,
+    `你的办公室身份是「${member.office_title}」。`,
+    member.responsibility ? `你的职责：${member.responsibility}` : "",
+    persona?.description ? `底层 Agent Persona：${persona.description}` : "",
+    "本次任务必须遵守办公室权限策略，若任务声明只读，则不得修改任何文件。",
+    "",
+    objective
+  ].filter(Boolean).join("\n");
+}
+
+function createOfficeTaskId(officeName: string): string {
+  const safeOffice = officeName.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "_").replace(/^_+|_+$/g, "") || "office";
+  return `office_${safeOffice}_${Date.now()}`;
 }
 
 async function prepareDispatch(task: AcpTask, agentName?: string): Promise<{

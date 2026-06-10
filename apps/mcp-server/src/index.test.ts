@@ -12,6 +12,7 @@ describe("mcp server", () => {
 
   it("exposes the MVP tool surface", () => {
     expect(tools.map((tool) => tool.name)).toEqual([
+      "dispatch_office_task",
       "dispatch_agent_task",
       "get_agent_task_status",
       "list_tasks",

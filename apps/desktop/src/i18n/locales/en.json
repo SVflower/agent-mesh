@@ -139,11 +139,14 @@
     "online": "online",
     "offline": "offline",
     "standby": "standby",
+    "queued": "queued",
+    "assigned": "assigned",
     "completed": "completed",
     "running": "running",
     "degraded": "degraded",
     "unknown": "unknown",
-    "failed": "failed"
+    "failed": "failed",
+    "cancelled": "cancelled"
   },
   "theme": {
     "light": "Light",

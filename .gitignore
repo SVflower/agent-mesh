@@ -14,10 +14,12 @@ target/
 # Desktop and Rust generated artifacts
 apps/desktop/src-tauri/target/
 apps/desktop/dist/
+apps/desktop/src-tauri/config/
 
 # Local runtime data
 .agent-mesh/
 .hermes/
+config/
 output/
 *.log
 

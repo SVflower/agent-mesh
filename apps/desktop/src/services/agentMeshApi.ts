@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type {
   AgentMeshConfig,
   CreateChatTaskPayload,
+  LocalAgentInventoryItem,
   LogTail,
   Office,
   Persona,
@@ -40,6 +41,10 @@ export const agentMeshApi = {
 
   listRuntimeAdapters() {
     return invoke<RuntimeAdapterStatus[]>('list_runtime_adapters')
+  },
+
+  discoverLocalAgents() {
+    return invoke<LocalAgentInventoryItem[]>('discover_local_agents')
   },
 
   listTasks() {

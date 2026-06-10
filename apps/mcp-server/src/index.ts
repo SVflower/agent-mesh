@@ -2,6 +2,7 @@
 import {
   dispatchTask,
   dispatchTaskAsync,
+  dispatchOfficeTask,
   cancelTask,
   getSessionStatus,
   getNodeStatus,
@@ -12,7 +13,7 @@ import {
   listTasks,
   resetSession
 } from "./dispatcher.js";
-import type { DispatchInput } from "./types.js";
+import type { DispatchInput, OfficeDispatchInput } from "./types.js";
 
 const serverInfo = {
   name: "agent-mesh",
@@ -20,6 +21,58 @@ const serverInfo = {
 };
 
 export const tools = [
+  {
+    name: "dispatch_office_task",
+    description: "Dispatch a task through an Agent Mesh office. This is channel-agnostic: Hermes/Feishu, Agent Mesh Chat, CLI, or future agents can call the same office-level contract.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "Optional unique task id. Defaults to an office-scoped generated id."
+        },
+        office: {
+          type: "string",
+          description: "Office id or office name, such as test or office_test_xxx."
+        },
+        officeId: {
+          type: "string",
+          description: "Explicit office id. Takes precedence over office."
+        },
+        channel: {
+          type: "string",
+          description: "Optional source channel id or label, such as feishu, agent-mesh-chat, or cli."
+        },
+        objective: {
+          type: "string",
+          description: "The user request to complete through the selected office."
+        },
+        repo: {
+          type: "string",
+          description: "Target repository path. Defaults to the office default workspace path or current working directory."
+        },
+        context: {
+          type: "object",
+          description: "Additional channel/user context."
+        },
+        acceptance: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional acceptance criteria. Defaults to the office task type criteria."
+        },
+        readOnly: {
+          type: "boolean",
+          description: "Force read-only constraints regardless of the office default policy."
+        },
+        mode: {
+          type: "string",
+          enum: ["async", "sync"],
+          description: "async returns immediately; sync waits for completion."
+        }
+      },
+      required: ["objective"]
+    }
+  },
   {
     name: "dispatch_agent_task",
     description: "Dispatch a bounded Agent Mesh task to an agent node. Defaults to async mode so long tasks do not hit channel or MCP timeouts. Current backend defaults to the claude-code node.",
@@ -302,6 +355,10 @@ async function handleMessage(payload: string): Promise<void> {
 }
 
 export async function callTool(params: any) {
+  if (params?.name === "dispatch_office_task") {
+    return toolResult(await dispatchOfficeTask(params.arguments as OfficeDispatchInput));
+  }
+
   if (params?.name === "get_agent_task_status") {
     return toolResult(await getTaskStatus(params.arguments?.id));
   }

@@ -69,6 +69,21 @@ struct RuntimeAdapterStatus {
   notes: &'static str,
 }
 
+#[derive(Serialize)]
+struct LocalAgentInventoryItem {
+  runtime_id: String,
+  runtime_kind: String,
+  runtime_name: String,
+  persona_id: Option<String>,
+  name: String,
+  profile_key: Option<String>,
+  description: Option<String>,
+  status: String,
+  source: String,
+  in_offices: Vec<String>,
+  diagnostic: String,
+}
+
 #[derive(Clone)]
 struct RuntimeCandidate {
   value: String,
@@ -87,6 +102,10 @@ struct SaveOfficePayload {
   office: Value,
   members: Vec<Value>,
   channel: Option<Value>,
+  #[serde(rename = "taskType")]
+  task_type: Option<Value>,
+  #[serde(rename = "routingPolicy")]
+  routing_policy: Option<Value>,
 }
 
 #[derive(Serialize)]
@@ -237,7 +256,7 @@ fn list_runtime_adapters() -> Vec<RuntimeAdapterStatus> {
       dispatch: "planned",
       cancel: "planned",
       session_status: "planned",
-      notes: "Profile and Channel relationships are modeled. Real profile switching and task entry still need adapter verification.",
+      notes: "已建模 Profile 与 Channel 关系；真实 profile 切换和外部入口仍待验证。",
     },
     RuntimeAdapterStatus {
       runtime_kind: "openclaw",
@@ -247,7 +266,7 @@ fn list_runtime_adapters() -> Vec<RuntimeAdapterStatus> {
       dispatch: "planned",
       cancel: "planned",
       session_status: "planned",
-      notes: "CoCo and Huajuan are maintained as manual Persona/Profile records until OpenClaw automatic discovery is verified.",
+      notes: "OpenClaw 当前仅做手动 Persona 维护；自动发现验证前，不把 CoCo 等配置视为真实可用。",
     },
     RuntimeAdapterStatus {
       runtime_kind: "codex",
@@ -257,7 +276,7 @@ fn list_runtime_adapters() -> Vec<RuntimeAdapterStatus> {
       dispatch: "implemented",
       cancel: "implemented",
       session_status: "implemented",
-      notes: "Dispatch uses codex exec --json with stdin prompt. Current machine still reports Access is denied when running Codex CLI.",
+      notes: "已接入 codex exec --json 派发路径；当前机器的 Codex CLI 仍存在权限异常。",
     },
     RuntimeAdapterStatus {
       runtime_kind: "claude-code",
@@ -267,7 +286,7 @@ fn list_runtime_adapters() -> Vec<RuntimeAdapterStatus> {
       dispatch: "verified",
       cancel: "implemented",
       session_status: "implemented",
-      notes: "Claude Code dispatch, worker pid cancellation, logs, result raw diagnostics, and session capture have been verified.",
+      notes: "Claude Code 已验证派发、取消、日志、诊断和 Session 捕获。",
     },
   ]
 }
@@ -317,6 +336,76 @@ fn list_personas() -> Result<Vec<Value>, String> {
 }
 
 #[tauri::command]
+fn discover_local_agents() -> Result<Vec<LocalAgentInventoryItem>, String> {
+  let config = read_config()?;
+  let runtimes = config.get("runtimes").and_then(Value::as_object).cloned().unwrap_or_default();
+  let personas = config.get("personas").and_then(Value::as_object).cloned().unwrap_or_default();
+  let office_members = config.get("officeMembers").and_then(Value::as_object).cloned().unwrap_or_default();
+
+  let mut rows = personas
+    .values()
+    .filter_map(|persona| {
+      let persona_id = persona.get("id").and_then(Value::as_str)?.to_string();
+      let runtime_id = persona.get("runtime_id").and_then(Value::as_str)?.to_string();
+      let runtime = runtimes.get(&runtime_id)?;
+      let runtime_kind = runtime.get("kind").and_then(Value::as_str).unwrap_or("unknown").to_string();
+      let runtime_name = runtime.get("name").and_then(Value::as_str).unwrap_or(&runtime_id).to_string();
+      let name = persona.get("name").and_then(Value::as_str).unwrap_or(&persona_id).to_string();
+      let profile_key = persona.get("profile_key").and_then(Value::as_str).map(str::to_string);
+      let description = persona.get("description").and_then(Value::as_str).map(str::to_string);
+      let source = persona.get("source").and_then(Value::as_str).unwrap_or("manual").to_string();
+      let enabled = persona.get("enabled").and_then(Value::as_bool).unwrap_or(true);
+      let in_offices = office_members
+        .values()
+        .filter(|member| member.get("persona_id").and_then(Value::as_str) == Some(persona_id.as_str()))
+        .filter_map(|member| member.get("office_id").and_then(Value::as_str).map(str::to_string))
+        .collect::<Vec<_>>();
+      let status = local_agent_status(&runtime_kind, &source, enabled, !in_offices.is_empty());
+      let diagnostic = local_agent_diagnostic(&runtime_kind, &source, enabled, &name, !in_offices.is_empty());
+
+      Some(LocalAgentInventoryItem {
+        runtime_id,
+        runtime_kind,
+        runtime_name,
+        persona_id: Some(persona_id),
+        name,
+        profile_key,
+        description,
+        status,
+        source,
+        in_offices,
+        diagnostic,
+      })
+    })
+    .collect::<Vec<_>>();
+
+  for runtime in runtimes.values() {
+    let runtime_id = runtime.get("id").and_then(Value::as_str).unwrap_or_default();
+    let has_persona = rows.iter().any(|row| row.runtime_id == runtime_id);
+    if has_persona {
+      continue;
+    }
+
+    rows.push(LocalAgentInventoryItem {
+      runtime_id: runtime_id.to_string(),
+      runtime_kind: runtime.get("kind").and_then(Value::as_str).unwrap_or("unknown").to_string(),
+      runtime_name: runtime.get("name").and_then(Value::as_str).unwrap_or(runtime_id).to_string(),
+      persona_id: None,
+      name: "未发现 Persona/Profile".to_string(),
+      profile_key: None,
+      description: None,
+      status: "unavailable".to_string(),
+      source: "runtime-only".to_string(),
+      in_offices: Vec::new(),
+      diagnostic: "仅检测到 Runtime 配置，尚未发现可用 Agent/Profile。".to_string(),
+    });
+  }
+
+  rows.sort_by_key(|row| format!("{}:{}", row.runtime_kind, row.name));
+  Ok(rows)
+}
+
+#[tauri::command]
 fn list_offices() -> Result<Vec<Value>, String> {
   let config = read_config()?;
   Ok(build_office_rows(&config))
@@ -332,6 +421,12 @@ fn save_office(payload: SaveOfficePayload) -> Result<Value, String> {
   }
   if let Some(channel) = &payload.channel {
     upsert_named_value(&mut config, "channels", channel)?;
+  }
+  if let Some(task_type) = &payload.task_type {
+    upsert_named_value(&mut config, "taskTypes", task_type)?;
+  }
+  if let Some(routing_policy) = &payload.routing_policy {
+    upsert_named_value(&mut config, "routingPolicies", routing_policy)?;
   }
 
   write_config(&config)?;
@@ -1657,6 +1752,50 @@ fn current_timestamp_millis() -> u128 {
     .unwrap_or_default()
 }
 
+fn local_agent_status(runtime_kind: &str, source: &str, enabled: bool, in_office: bool) -> String {
+  if !enabled {
+    return "unavailable".to_string();
+  }
+
+  if in_office {
+    return "managed".to_string();
+  }
+
+  if source == "detected" {
+    return "discovered".to_string();
+  }
+
+  if runtime_kind == "openclaw" {
+    return "unverified".to_string();
+  }
+
+  if source == "manual" {
+    return "manual".to_string();
+  }
+
+  "unverified".to_string()
+}
+
+fn local_agent_diagnostic(runtime_kind: &str, source: &str, enabled: bool, name: &str, in_office: bool) -> String {
+  if !enabled {
+    return "该 Persona/Profile 已禁用，不参与当前真实闭环测试。".to_string();
+  }
+
+  if in_office {
+    return "已加入至少一个办公室，属于 Agent Mesh managed Agent。".to_string();
+  }
+
+  if source == "detected" {
+    return "由本地发现流程识别，可导入办公室继续验证。".to_string();
+  }
+
+  if runtime_kind == "openclaw" {
+    return format!("{name} 来自配置记录，尚未由 OpenClaw 本地发现流程确认可用。");
+  }
+
+  "来自默认或手动配置，尚未在当前真实闭环中验证。".to_string()
+}
+
 fn iso_timestamp() -> String {
   current_timestamp_millis().to_string()
 }
@@ -1670,6 +1809,7 @@ pub fn run() {
       load_agent_mesh_config,
       save_agent_mesh_config,
       list_personas,
+      discover_local_agents,
       list_offices,
       save_office,
       list_tasks,
