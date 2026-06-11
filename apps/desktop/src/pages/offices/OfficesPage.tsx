@@ -34,7 +34,9 @@ export function OfficesPage({
   onOpenOffice: (officeId: string) => void
   t: Translator
 }) {
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string>(offices[0]?.id ?? '')
   const detectedCount = runtimeAssets.filter((runtime) => runtime.installed).length
+  const selectedOffice = offices.find((office) => office.id === selectedOfficeId)
 
   return (
     <div className="officePage">
@@ -51,11 +53,19 @@ export function OfficesPage({
         <aside className="officeListPane">
           <div className="officeListHeader">
             <strong>办公室列表</strong>
-            <Status value={scanState === 'scanning' ? 'running' : 'available'} label={`${detectedCount}/4 Runtime · ${personas.length} Persona`} />
+            <span className="officeListCount">{offices.length}</span>
+          </div>
+          <div className="officeListMeta">
+            <Status value={scanState === 'scanning' ? 'running' : 'available'} label={scanState === 'scanning' ? '扫描中' : '就绪'} />
+            <span>{detectedCount}/4 Runtime · {personas.length} Persona</span>
           </div>
           <div className="officeTreeList">
             {offices.map((office) => (
-              <button className="officeTreeItem" key={office.id} onClick={() => onOpenOffice(office.id)}>
+              <button
+                className={`officeTreeItem ${selectedOfficeId === office.id ? 'active' : ''}`}
+                key={office.id}
+                onClick={() => setSelectedOfficeId(office.id)}
+              >
                 <span className="officeGlyph">O</span>
                 <div>
                   <strong>{office.name}</strong>
@@ -67,33 +77,19 @@ export function OfficesPage({
           </div>
         </aside>
 
-        <section className="officeGallery">
-          {offices.map((office) => {
-            const members = office.members ?? []
-            const primary = members.find((member) => member.role === 'primary') ?? members[0]
-            return (
-              <article className="officeShowCard" key={office.id}>
-                <div className="officeShowHead">
-                  <div>
-                    <p className="eyebrow">ACTIVE OFFICE</p>
-                    <h2>{office.name}</h2>
-                    <span>{office.description || '本地 Agent 团队'}</span>
-                  </div>
-                  <Status value={office.paused ? 'standby' : 'online'} label={office.paused ? '暂停' : '在线'} />
-                </div>
-
-                <OfficeOrbit members={members} primary={primary} />
-
-                <div className="officePolicyStrip">
-                  <Metric label="Channel" value={displayChannelName(office.default_channel_id)} raw={office.default_channel_id} />
-                  <Metric label="Permission" value={displayPermissionName(office.default_permission_policy_id)} raw={office.default_permission_policy_id} />
-                  <Metric label="Routing" value={displayRoutingName(office.default_routing_policy_id)} raw={office.default_routing_policy_id} />
-                </div>
-                <button className="secondaryButton" onClick={() => onOpenOffice(office.id)}>查看详情</button>
-              </article>
-            )
-          })}
-        </section>
+        {selectedOffice ? (
+          <section className="officePreviewPane">
+            <OfficePreview office={selectedOffice} onOpenDetail={onOpenOffice} />
+          </section>
+        ) : (
+          <section className="officePreviewPane">
+            <div className="emptyOfficePreview">
+              <p className="eyebrow">NO OFFICE SELECTED</p>
+              <h2>选择一个办公室</h2>
+              <p>在左侧列表中点击办公室查看详细信息</p>
+            </div>
+          </section>
+        )}
       </section>
     </div>
   )
@@ -463,6 +459,53 @@ function OfficeOrbit({ members, primary, large = false }: { members: OfficeMembe
         </div>
       ))}
       {overflow > 0 ? <div className="orbitOverflow">+{overflow}</div> : null}
+    </div>
+  )
+}
+
+function OfficePreview({ office, onOpenDetail }: { office: Office; onOpenDetail: (officeId: string) => void }) {
+  const members = office.members ?? []
+  const primary = members.find((member) => member.role === 'primary') ?? members[0]
+
+  return (
+    <div className="officeSummaryCard">
+      <div className="officeSummaryHeader">
+        <div>
+          <p className="eyebrow">SELECTED OFFICE</p>
+          <h2>{office.name}</h2>
+          <p className="officeSummaryDesc">{office.description || '本地 Agent 团队'}</p>
+        </div>
+        <Status value={office.paused ? 'standby' : 'online'} label={office.paused ? '暂停' : '在线'} />
+      </div>
+
+      <div className="officeSummaryBody">
+        <OfficeOrbit members={members} primary={primary} large />
+      </div>
+
+      <div className="officeSummaryStats">
+        <div className="summaryStat">
+          <small>成员数量</small>
+          <strong>{members.length}</strong>
+        </div>
+        <div className="summaryStat">
+          <small>主 Agent</small>
+          <strong>{primary?.persona?.name ?? '-'}</strong>
+        </div>
+        <div className="summaryStat">
+          <small>工作目录</small>
+          <strong>{office.default_workspace_path ?? '.'}</strong>
+        </div>
+      </div>
+
+      <div className="officeSummaryPolicies">
+        <Metric label="Channel" value={displayChannelName(office.default_channel_id)} raw={office.default_channel_id} />
+        <Metric label="Permission" value={displayPermissionName(office.default_permission_policy_id)} raw={office.default_permission_policy_id} />
+        <Metric label="Routing" value={displayRoutingName(office.default_routing_policy_id)} raw={office.default_routing_policy_id} />
+      </div>
+
+      <div className="officeSummaryActions">
+        <button onClick={() => onOpenDetail(office.id)}>查看详情</button>
+      </div>
     </div>
   )
 }

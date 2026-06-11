@@ -21,6 +21,8 @@ type Invocation = {
   stdin: string;
 };
 
+type PendingObserverWrites = Set<Promise<void>>;
+
 export async function runClaudeTask(task: AcpTask, agent: AgentConfig): Promise<AgentResult> {
   const timeoutMs = agent.timeoutMs ?? 900000;
   const output = await runProcess(await createClaudeInvocation(task, agent), {
@@ -108,11 +110,12 @@ function runProcess(
     let stdout = "";
     let stderr = "";
     let finished = false;
+    const pendingObserverWrites: PendingObserverWrites = new Set();
 
     const timer = setTimeout(() => {
       if (finished) return;
       child.kill();
-      observe(options.observer, "process_timeout", {
+      observe(options.observer, pendingObserverWrites, "process_timeout", {
         command: invocation.command,
         timeoutMs: options.timeoutMs
       });
@@ -126,16 +129,16 @@ function runProcess(
     child.stdout.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
       stdout += text;
-      observeChunk(options.observer, "stdout", text);
+      observeChunk(options.observer, pendingObserverWrites, "stdout", text);
     });
 
     child.stderr.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
       stderr += text;
-      observeChunk(options.observer, "stderr", text);
+      observeChunk(options.observer, pendingObserverWrites, "stderr", text);
     });
 
-    observe(options.observer, "prompt_sent", {
+    observe(options.observer, pendingObserverWrites, "prompt_sent", {
       bytes: Buffer.byteLength(invocation.stdin, "utf8")
     });
     child.stdin.end(invocation.stdin);
@@ -143,45 +146,67 @@ function runProcess(
     child.on("error", (error) => {
       clearTimeout(timer);
       finished = true;
-      observe(options.observer, "process_error", {
+      observe(options.observer, pendingObserverWrites, "process_error", {
         message: error.message
       });
-      reject(createProcessError(error.message, invocation, {
+      flushObserverWrites(pendingObserverWrites).finally(() => reject(createProcessError(error.message, invocation, {
         stdout,
         stderr,
         exitCode: null,
         cause: error
-      }));
+      })));
     });
 
     child.on("close", (exitCode) => {
       clearTimeout(timer);
       finished = true;
-      observe(options.observer, "process_exit", { exitCode });
-      resolve({
+      observe(options.observer, pendingObserverWrites, "process_exit", { exitCode });
+      flushObserverWrites(pendingObserverWrites).finally(() => resolve({
         exitCode,
         stdout,
         stderr,
         command: invocation.command,
         args: invocation.args,
         cwd: invocation.cwd
-      });
+      }));
     });
   });
 }
 
-function observe(observer: AcpTask["observer"], type: string, data: Record<string, unknown> = {}): void {
+function observe(
+  observer: AcpTask["observer"],
+  pendingObserverWrites: PendingObserverWrites,
+  type: string,
+  data: Record<string, unknown> = {}
+): void {
   if (!observer) return;
-  appendTaskEvent(observer.stateDir, observer.taskId, type, data).catch(() => {});
+  trackObserverWrite(pendingObserverWrites, appendTaskEvent(observer.stateDir, observer.taskId, type, data));
 }
 
-function observeChunk(observer: AcpTask["observer"], stream: "stdout" | "stderr", text: string): void {
+function observeChunk(
+  observer: AcpTask["observer"],
+  pendingObserverWrites: PendingObserverWrites,
+  stream: "stdout" | "stderr",
+  text: string
+): void {
   if (!observer) return;
-  appendTaskLog(observer.stateDir, observer.taskId, stream, text).catch(() => {});
-  appendTaskEvent(observer.stateDir, observer.taskId, `${stream}_chunk`, {
+  trackObserverWrite(pendingObserverWrites, appendTaskLog(observer.stateDir, observer.taskId, stream, text));
+  trackObserverWrite(pendingObserverWrites, appendTaskEvent(observer.stateDir, observer.taskId, `${stream}_chunk`, {
     bytes: Buffer.byteLength(text, "utf8"),
     preview: text.trim().slice(0, 500)
-  }).catch(() => {});
+  }));
+}
+
+function trackObserverWrite(pendingObserverWrites: PendingObserverWrites, write: Promise<unknown>): void {
+  const safeWrite = write.catch(() => {}) as Promise<void>;
+  pendingObserverWrites.add(safeWrite);
+  safeWrite.finally(() => pendingObserverWrites.delete(safeWrite)).catch(() => {});
+}
+
+async function flushObserverWrites(pendingObserverWrites: PendingObserverWrites): Promise<void> {
+  while (pendingObserverWrites.size > 0) {
+    await Promise.all([...pendingObserverWrites]);
+  }
 }
 
 // Windows 上 Node.js spawn 不一定能直接找到 claude.cmd，所以需要显式包装 cmd /d /c call。
@@ -371,4 +396,3 @@ function normalizeStatus(status: unknown): "completed" | "failed" | "blocked" {
   if (status === "completed" || status === "failed" || status === "blocked") return status;
   return "failed";
 }
-

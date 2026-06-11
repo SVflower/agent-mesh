@@ -5,7 +5,7 @@ import { TASK_STATUSES, createEnvelope, transition, validateTask } from "./acp.j
 import { clearClaudeSession, getClaudeSession, runClaudeTask } from "./agents/claude.js";
 import { loadConfig, getAgent, loadDesktopConfig } from "./config.js";
 import { appendTaskEvent } from "./observability.js";
-import { readTaskEvents, readTaskLogTail } from "./observability.js";
+import { readTaskEvents, readTaskLogTail, taskArtifactPath } from "./observability.js";
 import { listEnvelopes, loadEnvelope, saveEnvelope, taskStatePath } from "./state.js";
 import type {
   AcpTask,
@@ -62,6 +62,7 @@ export async function dispatchTaskAsync(input: DispatchInput) {
       id: envelope.id,
       status: envelope.status,
       stateFile,
+      ...taskArtifacts(config.stateDir, envelope.id),
       pid: child.pid,
       message: "Task dispatched asynchronously. Use get_agent_task_status to poll for completion."
     };
@@ -512,13 +513,25 @@ function failureResult(error: unknown): AgentResult {
 }
 
 function summarizeEnvelope(envelope: TaskEnvelope, stateFile: string) {
+  const stateDir = path.dirname(path.dirname(stateFile));
+
   return {
     id: envelope.id,
     status: envelope.status,
     result: envelope.result,
     stateFile,
+    ...taskArtifacts(stateDir, envelope.id),
     updatedAt: envelope.updatedAt,
     events: envelope.events
+  };
+}
+
+function taskArtifacts(stateDir: string, taskId: string) {
+  return {
+    stateDir,
+    eventsFile: taskArtifactPath(stateDir, taskId, "events.jsonl"),
+    stdoutLogFile: taskArtifactPath(stateDir, taskId, "stdout.log"),
+    stderrLogFile: taskArtifactPath(stateDir, taskId, "stderr.log")
   };
 }
 
