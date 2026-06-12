@@ -46,6 +46,9 @@ export function formatLogLine(path: string, line: string) {
       parsed.status,
       parsed.message,
       parsed.summary,
+      parsed.permissionMode ? `permission=${parsed.permissionMode}` : '',
+      parsed.changedFiles?.length ? `changed=${parsed.changedFiles.join(', ')}` : '',
+      parsed.cwd ? `cwd=${parsed.cwd}` : '',
       parsed.taskId ? `task=${parsed.taskId}` : '',
     ]
       .filter(Boolean)
@@ -115,6 +118,9 @@ function tryParseJsonLine(line: string) {
     const parsed = JSON.parse(line.slice(jsonStart)) as Record<string, unknown>
     return {
       message: typeof parsed.message === 'string' ? parsed.message : undefined,
+      changedFiles: Array.isArray(parsed.changed_files) ? parsed.changed_files.filter((item): item is string => typeof item === 'string') : undefined,
+      cwd: typeof parsed.cwd === 'string' ? parsed.cwd : undefined,
+      permissionMode: typeof parsed.permission_mode === 'string' ? parsed.permission_mode : undefined,
       status: typeof parsed.status === 'string' ? parsed.status : undefined,
       summary: typeof parsed.summary === 'string' ? parsed.summary : undefined,
       taskId: typeof parsed.taskId === 'string' ? parsed.taskId : undefined,
@@ -147,19 +153,88 @@ function extractNewestIsoTimestamp(text: string) {
 }
 
 export function getTaskDiagnostics(detail: Record<string, unknown>) {
+  const result = asRecord(detail.result)
   const raw = getResultRaw(detail)
-  if (!raw) return []
+  const routingDecision = asRecord(detail.routingDecision)
+  const delegation = asRecord(detail.delegation)
+  const permissionDecision = asRecord(detail.permissionDecision)
+  const writeCheck = summarizeWriteCheck(detail)
 
   return [
-    ['exitCode', raw.exitCode],
-    ['command', raw.command],
-    ['args', Array.isArray(raw.args) ? raw.args.join(' ') : raw.args],
-    ['cwd', raw.cwd],
-    ['stderr', trimDiagnostic(raw.stderr)],
-    ['stdout', trimDiagnostic(raw.stdout)],
+    ['routing', routingDecision ? compactObjectSummary(routingDecision, ['strategy', 'selected_member_title', 'selected_runtime_kind', 'reason']) : undefined],
+    ['delegation', delegation ? compactObjectSummary(delegation, ['requester', 'assignee_title', 'assignee_runtime_kind', 'workspace_path']) : undefined],
+    ['permission', permissionDecision ? compactObjectSummary(permissionDecision, ['mode', 'decision', 'write_detection_required']) : undefined],
+    ['writeCheck', writeCheck],
+    ['exitCode', raw?.exitCode],
+    ['command', raw?.command],
+    ['args', Array.isArray(raw?.args) ? raw.args.join(' ') : raw?.args],
+    ['cwd', raw?.cwd],
+    ['changedFiles', Array.isArray(result?.changed_files) ? result.changed_files.join(', ') || '[]' : result?.changed_files],
+    ['writeViolations', Array.isArray(result?.write_violations) ? result.write_violations.join(', ') || '[]' : result?.write_violations],
+    ['stderr', trimDiagnostic(raw?.stderr)],
+    ['stdout', trimDiagnostic(raw?.stdout)],
   ]
     .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
     .map(([label, value]) => ({ label: String(label), value: safeDisplayText(value, '内容不可读或过长，已隐藏') }))
+}
+
+export type PermissionOutcome = {
+  title: string
+  description: string
+  tone: 'success' | 'warning' | 'danger' | 'neutral'
+  changedFiles: string[]
+}
+
+export function getPermissionOutcome(detail: Record<string, unknown> | null, logs: LogTail[]): PermissionOutcome {
+  const result = asRecord(detail?.result)
+  const permissionDecision = asRecord(detail?.permissionDecision)
+  const mode = textValue(permissionDecision?.mode) ?? 'unknown'
+  const changedFiles = [
+    ...stringArray(result?.write_violations),
+    ...stringArray(result?.changed_files),
+    ...extractChangedFilesFromLogs(logs),
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean)
+  const uniqueChangedFiles = [...new Set(changedFiles)]
+  const detectionStatus = textValue(result?.write_detection_status)
+  const hasViolationEvent = logs.some((log) => log.lines.some((line) => line.includes('"write_policy_violation"')))
+  const hasPassedEvent = logs.some((log) => log.lines.some((line) => line.includes('"permission_check_passed"')))
+  const hasUnavailableEvent = logs.some((log) => log.lines.some((line) => line.includes('"permission_check_unavailable"')))
+
+  if (hasViolationEvent || detectionStatus === 'violated' || uniqueChangedFiles.length > 0) {
+    return {
+      title: '写入检测：发现越权',
+      description: `${mode} 任务检测到写入变化。`,
+      tone: 'danger',
+      changedFiles: uniqueChangedFiles,
+    }
+  }
+
+  if (hasUnavailableEvent || detectionStatus === 'unavailable') {
+    return {
+      title: '写入检测：未能确认',
+      description: `${mode} 任务未能完成 git status 前后校验，请查看日志。`,
+      tone: 'warning',
+      changedFiles: [],
+    }
+  }
+
+  if (hasPassedEvent || detectionStatus === 'passed') {
+    return {
+      title: '写入检测：通过',
+      description: `${mode} 任务未发现新增写入变化。`,
+      tone: 'success',
+      changedFiles: [],
+    }
+  }
+
+  return {
+    title: '写入检测：暂无结果',
+    description: mode === 'read-only' ? 'read-only 任务尚未记录最终写入检测事件。' : `当前权限模式为 ${mode}。`,
+    tone: 'neutral',
+    changedFiles: [],
+  }
 }
 
 function getResultRaw(detail: Record<string, unknown>) {
@@ -169,8 +244,38 @@ function getResultRaw(detail: Record<string, unknown>) {
   return typeof raw === 'object' && raw !== null ? raw as Record<string, unknown> : null
 }
 
+function asRecord(value: unknown) {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : null
+}
+
+function compactObjectSummary(record: Record<string, unknown>, keys: string[]) {
+  return keys
+    .map((key) => {
+      const value = record[key]
+      if (value === undefined || value === null || value === '') return ''
+      return `${key}=${String(value)}`
+    })
+    .filter(Boolean)
+    .join(' · ')
+}
+
 function trimDiagnostic(value: unknown) {
   if (typeof value !== 'string') return value
   const compact = value.trim()
   return compact.length > 700 ? `${compact.slice(0, 700)}...` : compact
+}
+
+function textValue(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function extractChangedFilesFromLogs(logs: LogTail[]) {
+  return logs.flatMap((log) => log.lines.flatMap((line) => {
+    const parsed = tryParseJsonLine(line)
+    return parsed?.changedFiles ?? []
+  }))
 }

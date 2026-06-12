@@ -51,16 +51,29 @@ export function deriveDispatchGraph(
   }
 
   const state = mapTaskState(session?.status ?? task.status)
-  const workerName = displayAgentName(task.agent || session?.runtime_id || task.agent_type || 'agent')
+  const delegation = asRecord(detail?.delegation)
+  const routingDecision = asRecord(detail?.routingDecision)
+  const permissionDecision = asRecord(detail?.permissionDecision)
+  const workerName = textValue(delegation?.assignee_title)
+    ?? textValue(routingDecision?.selected_member_title)
+    ?? displayAgentName(task.agent || session?.runtime_id || task.agent_type || 'agent')
   const toolLabels = extractToolLabels(detail, logs)
-  const edgeLabel = toolLabels[0] ?? summarize(task.objective)
+  const routingReason = textValue(routingDecision?.reason) ?? textValue(delegation?.reason)
+  const permissionMode = textValue(permissionDecision?.mode)
+  const edgeLabel = routingReason ? summarize(routingReason, 42) : toolLabels[0] ?? summarize(task.objective)
   const resultState = task.status === 'completed' ? 'done' : task.status === 'failed' || task.status === 'cancelled' ? 'error' : 'standby'
+  const workerCaption = [
+    textValue(delegation?.assignee_responsibility),
+    permissionMode ? `权限: ${permissionMode}` : undefined,
+    toolLabels.length > 0 ? toolLabels.join(' / ') : undefined,
+    task.agent_type,
+  ].filter(Boolean).join(' · ')
 
   return {
     nodes: [
       { id: 'user', label: '用户指令', role: 'user', state: 'done', caption: taskObjectiveLabel(task) },
-      { id: 'captain', label: '主 Agent', role: 'captain', state: task.status === 'queued' ? 'waiting' : task.status === 'running' ? 'executing' : 'done', caption: '接收任务，选择路由策略，并汇总成员结果。' },
-      { id: 'worker', label: workerName, role: 'worker', state, caption: toolLabels.length > 0 ? toolLabels.join(' / ') : (task.agent_type || '协作执行成员') },
+      { id: 'captain', label: '主 Agent', role: 'captain', state: task.status === 'queued' ? 'waiting' : task.status === 'running' ? 'executing' : 'done', caption: routingReason ?? '接收任务，选择路由策略，并汇总成员结果。' },
+      { id: 'worker', label: workerName, role: 'worker', state, caption: workerCaption || '协作执行成员' },
       { id: 'result', label: '结果回传', role: 'result', state: resultState, caption: extractResultSummary(detail) },
     ],
     edges: [
@@ -121,9 +134,9 @@ function extractToolLabels(detail?: Record<string, unknown> | null, logs: LogTai
   return [...labels]
 }
 
-function summarize(value: string) {
+function summarize(value: string, limit = 28) {
   const trimmed = value.trim()
-  return trimmed.length > 28 ? `${trimmed.slice(0, 28)}...` : trimmed || '任务指令'
+  return trimmed.length > limit ? `${trimmed.slice(0, limit)}...` : trimmed || '任务指令'
 }
 
 function displayAgentName(value: string) {
@@ -132,4 +145,12 @@ function displayAgentName(value: string) {
   if (value.includes('openclaw')) return 'OpenClaw'
   if (value.includes('hermes')) return 'Hermes'
   return value
+}
+
+function asRecord(value: unknown) {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : undefined
+}
+
+function textValue(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }

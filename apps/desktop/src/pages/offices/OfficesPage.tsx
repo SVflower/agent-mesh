@@ -99,6 +99,7 @@ export function OfficeDetailPage({
   config,
   office,
   onBack,
+  onConfigSaved,
 }: {
   config: AgentMeshConfig
   office?: Office
@@ -106,6 +107,15 @@ export function OfficeDetailPage({
   onConfigSaved: () => Promise<void>
   t: Translator
 }) {
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(office?.name ?? '')
+  const [description, setDescription] = useState(office?.description ?? '')
+  const [workspacePath, setWorkspacePath] = useState(office?.default_workspace_path ?? '.')
+  const [saving, setSaving] = useState(false)
+  const [dismissing, setDismissing] = useState<false | 'confirm' | 'progress' | 'done'>(false)
+  const [dismissProgress, setDismissProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+
   if (!office) {
     return <div className="officePage"><div className="emptyState">尚未选择办公室。</div></div>
   }
@@ -115,6 +125,100 @@ export function OfficeDetailPage({
   const policy = office.default_permission_policy_id ? config.permissionPolicies?.[office.default_permission_policy_id] : undefined
   const routing = office.default_routing_policy_id ? config.routingPolicies?.[office.default_routing_policy_id] : undefined
 
+  async function saveEdit() {
+    if (!office) return
+    setSaving(true)
+    setError(null)
+    try {
+      await agentMeshApi.saveOffice({
+        office: {
+          ...office,
+          name: name.trim() || office.name,
+          description: description.trim(),
+          default_workspace_path: workspacePath.trim() || '.',
+          updated_at: new Date().toISOString(),
+        },
+        members,
+      })
+      await onConfigSaved()
+      setEditing(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDismiss() {
+    if (!office) return
+    setDismissing('progress')
+    setDismissProgress(0)
+    setError(null)
+
+    // Animate progress to show work is being done
+    const steps = ['清理成员关系...', '移除渠道绑定...', '清理路由策略...', '移除任务类型...', '解散办公室...']
+    for (let i = 0; i < steps.length; i++) {
+      setDismissProgress(Math.round(((i + 1) / steps.length) * 80))
+      await new Promise((r) => setTimeout(r, 200))
+    }
+
+    try {
+      await agentMeshApi.deleteOffice(office.id)
+      setDismissProgress(100)
+      setDismissing('done')
+      await new Promise((r) => setTimeout(r, 400))
+      await onConfigSaved()
+      onBack()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setDismissing(false)
+      setDismissProgress(0)
+    }
+  }
+
+  // 解散确认 / 进行中覆盖层
+  if (dismissing === 'confirm') {
+    const relatedCount = members.length
+      + (Object.values(config.routingPolicies ?? {}).filter((p) => p.office_id === office.id).length)
+      + (Object.values(config.channels ?? {}).filter((c) => c.office_id === office.id).length)
+    return (
+      <div className="officePage">
+        <div className="dismissOverlay">
+          <div className="dismissCard">
+            <h2>解散办公室「{office.name}」</h2>
+            <p>解散后将同时清理以下关联数据：</p>
+            <ul>
+              <li>{members.length} 个成员关系</li>
+              <li>关联的渠道、路由策略和任务类型配置</li>
+              <li>预计清理 {relatedCount} 条办公室关联配置</li>
+            </ul>
+            <p className="dismissWarning">此操作不可撤回。已完成的历史任务记录不会被删除。</p>
+            <div className="actions">
+              <button className="dangerButton" onClick={() => void handleDismiss()}>确认解散</button>
+              <button className="secondaryButton" onClick={() => setDismissing(false)}>取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (dismissing === 'progress' || dismissing === 'done') {
+    return (
+      <div className="officePage">
+        <div className="dismissOverlay">
+          <div className="dismissCard">
+            <h2>{dismissing === 'done' ? '办公室已解散' : '正在解散办公室...'}</h2>
+            <div className="progressBar">
+              <div className="progressFill" style={{ width: `${dismissProgress}%` }} />
+            </div>
+            <p className="progressLabel">{dismissing === 'done' ? '完成，正在返回...' : '清理关联数据中...'}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="officePage">
       <header className="pageHeader">
@@ -123,26 +227,46 @@ export function OfficeDetailPage({
           <h1>{office.name}</h1>
           <p>{office.description || '本地 Agent 团队'}</p>
         </div>
-        <button className="secondaryButton" onClick={onBack}>返回</button>
+        <div className="actions">
+          {!editing && <button className="secondaryButton" onClick={() => { setEditing(true); setName(office.name); setDescription(office.description ?? ''); setWorkspacePath(office.default_workspace_path ?? '.') }}>编辑</button>}
+          {!editing && <button className="dangerButton" onClick={() => setDismissing('confirm')}>解散办公室</button>}
+          <button className="secondaryButton" onClick={onBack}>返回</button>
+        </div>
       </header>
 
-      <section className="officeDetailShowcase">
-        <div className="officeHeroPanel">
-          <OfficeOrbit members={members} primary={primary} large />
-        </div>
-        <aside className="officeInspector">
-          <Metric label="状态" value={office.paused ? '暂停' : '在线'} />
-          <Metric label="创建时间" value={formatDate(office.created_at)} />
-          <Metric label="默认工作目录" value={office.default_workspace_path ?? '.'} />
-          <Metric label="Channel" value={displayChannelName(office.default_channel_id)} raw={office.default_channel_id} />
-          <div className="permissionRail">
-            <span className={policy?.default_mode === 'read-only' ? 'active' : ''}>只读</span>
-            <span className={policy?.default_mode === 'safe-write' ? 'active' : ''}>安全写入</span>
-            <span className={policy?.default_mode === 'full-access' ? 'active' : ''}>完全访问</span>
+      {error && <div className="saveNotice error">{error}</div>}
+
+      {editing ? (
+        <section className="officeEditSection">
+          <div className="officeEditGrid compact">
+            <label><span>办公室名称</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+            <label><span>描述</span><textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
+            <label><span>默认工作目录</span><input value={workspacePath} onChange={(e) => setWorkspacePath(e.target.value)} /></label>
           </div>
-          <Metric label="路由策略" value={displayRoutingName(routing?.strategy ?? office.default_routing_policy_id)} raw={office.default_routing_policy_id} />
-        </aside>
-      </section>
+          <div className="actions" style={{ marginTop: '1rem' }}>
+            <button disabled={saving} onClick={() => void saveEdit()}>{saving ? '保存中...' : '保存'}</button>
+            <button className="secondaryButton" onClick={() => setEditing(false)}>取消</button>
+          </div>
+        </section>
+      ) : (
+        <section className="officeDetailShowcase">
+          <div className="officeHeroPanel">
+            <OfficeOrbit members={members} primary={primary} large />
+          </div>
+          <aside className="officeInspector">
+            <Metric label="状态" value={office.paused ? '暂停' : '在线'} />
+            <Metric label="创建时间" value={formatDate(office.created_at)} />
+            <Metric label="默认工作目录" value={office.default_workspace_path ?? '.'} />
+            <Metric label="Channel" value={displayChannelName(office.default_channel_id)} raw={office.default_channel_id} />
+            <div className="permissionRail">
+              <span className={policy?.default_mode === 'read-only' ? 'active' : ''}>只读</span>
+              <span className={policy?.default_mode === 'safe-write' ? 'active' : ''}>安全写入</span>
+              <span className={policy?.default_mode === 'full-access' ? 'active' : ''}>完全访问</span>
+            </div>
+            <Metric label="路由策略" value={displayRoutingName(routing?.strategy ?? office.default_routing_policy_id)} raw={office.default_routing_policy_id} />
+          </aside>
+        </section>
+      )}
     </div>
   )
 }

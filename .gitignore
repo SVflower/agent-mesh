@@ -18,13 +18,12 @@ apps/desktop/src-tauri/config/
 
 # Local runtime data
 .agent-mesh/
+.claude/
+.cargo/
 .hermes/
 config/
 output/
 *.log
-
-# Documentation and design drafts not included in the current code commit
-docs/
 
 # Local environment and secrets
 .env

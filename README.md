@@ -40,6 +40,7 @@ Runtime
 - ✅ 本地 Agent Runtime 自动检测（安装状态、版本、CLI 路径）
 - ✅ Persona/Profile 管理（新增、编辑、启用/禁用）
 - ✅ 办公室创建向导（选择 Captain + 协作成员 + 权限策略 + 渠道绑定）
+- ✅ 办公室编辑（名称、描述、工作目录）和解散（级联清理关联数据 + 进度条过渡）
 - ✅ Agent Mesh Chat 本地任务入口
 - ✅ 异步任务派发与可观测（状态、事件、日志、结果、诊断）
 - ✅ Claude Code adapter 真实验证通过
@@ -65,7 +66,7 @@ Tauri 2 + React 19 + TypeScript 5.7 + Vite 7 + Rust
 ```
 
 - 前端：React + 纯自定义 CSS（暗色主题），无组件库依赖
-- 后端：Tauri 2 Rust commands（16 个），负责 Runtime 检测、进程管理、配置持久化
+- 后端：Tauri 2 Rust commands（17 个），负责 Runtime 检测、进程管理、配置持久化
 - MCP Server：TypeScript，提供标准 MCP stdio 协议
 - 第一阶段 TypeScript 优先，Rust 逐步接管 daemon 和进程管理
 

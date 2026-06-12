@@ -24,7 +24,7 @@ export function TasksPage({ config, offices, t }: { config: AgentMeshConfig; off
 
   const selectedOffice = offices.find((office) => office.id === officeId) ?? offices[0]
   const selectedTask = tasks.find((task) => task.id === selectedTaskId)
-  const diagnostics = selectedTaskDetail ? getTaskDiagnostics(selectedTaskDetail).slice(0, 5) : []
+  const diagnostics = selectedTaskDetail ? getTaskDiagnostics(selectedTaskDetail) : []
   const logLines = useMemo(() => compactLogLines(logs, 24), [logs])
   const graph = useMemo(() => deriveDispatchGraph(selectedTask, selectedTaskDetail, selectedSession, logs), [logs, selectedSession, selectedTask, selectedTaskDetail])
   const canPublish = Boolean(selectedOffice && draft.trim() && publishState !== 'publishing')
