@@ -792,8 +792,9 @@ fn dispatch_chat_task(task_id: String) -> Result<Value, String> {
 
   let worker_task = task.clone();
   let worker_task_id = task_id.clone();
+  let worker_config = config.clone();
   thread::spawn(move || {
-    run_cli_chat_worker(adapter, worker_task_id, task_path, task_dir, root, executable_path, worker_task);
+    run_cli_chat_worker(adapter, worker_task_id, task_path, task_dir, root, executable_path, worker_task, worker_config);
   });
 
   Ok(task)
@@ -1002,10 +1003,12 @@ fn run_cli_chat_worker(
   root: PathBuf,
   executable_path: PathBuf,
   mut task: Value,
+  config: Value,
 ) {
   let started_at = iso_timestamp();
-  let invocation_args = adapter.invocation_args.iter().map(|arg| arg.to_string()).collect::<Vec<_>>();
-  let prompt = build_agent_prompt(&task);
+  let permission_mode = resolve_permission_mode(&config, &task);
+  let invocation_args = effective_invocation_args(&adapter, &permission_mode);
+  let prompt = build_agent_prompt(&config, &task);
 
   let _ = append_jsonl_event(
     &task_dir,
@@ -1020,6 +1023,12 @@ fn run_cli_chat_worker(
   );
   let _ = push_and_write_task_event(&task_path, &mut task, "running", &format!("{} worker started.", adapter.display_name), Some(started_at));
 
+  let git_before = if permission_mode == "read-only" {
+    git_status_snapshot(&root)
+  } else {
+    None
+  };
+
   let output = run_agent_process(&executable_path, &invocation_args, &root, &prompt, |pid| {
     let at = iso_timestamp();
     record_worker_pid(&task_path, &task_dir, &task_id, pid, at).map_err(|error| {
@@ -1032,7 +1041,29 @@ fn run_cli_chat_worker(
     Ok(process_output) => {
       let _ = fs::write(task_dir.join("stdout.log"), &process_output.stdout);
       let _ = fs::write(task_dir.join("stderr.log"), &process_output.stderr);
-      let result = normalize_process_result(&process_output);
+      let mut result = normalize_process_result(&process_output);
+
+      // Write detection for read-only tasks
+      if let Some(before) = &git_before {
+        let after = git_status_snapshot(&root).unwrap_or_default();
+        let violations = detect_write_violations(before, &after);
+        if !violations.is_empty() {
+          if let Some(obj) = result.as_object_mut() {
+            obj.insert("write_violations".to_string(), serde_json::json!(violations));
+          }
+          let _ = append_jsonl_event(
+            &task_dir,
+            serde_json::json!({
+              "at": iso_timestamp(),
+              "taskId": task_id,
+              "type": "write_policy_violation",
+              "permission_mode": "read-only",
+              "changed_files": violations
+            }),
+          );
+        }
+      }
+
       let persisted_session = persist_runtime_session_from_output(&process_output, &root, &finished_at).ok().flatten();
       let status = result.get("status").and_then(Value::as_str).unwrap_or("completed").to_string();
       let final_status = if process_output.exit_code == Some(0) && status == "completed" {
@@ -1151,7 +1182,104 @@ where
   })
 }
 
-fn build_agent_prompt(task: &Value) -> String {
+fn build_office_context_section(config: &Value, task: &Value) -> String {
+  let task_body = task.get("task").unwrap_or(task);
+  let office_id = task_body.get("office_id").and_then(Value::as_str).unwrap_or_default();
+  if office_id.is_empty() {
+    return String::new();
+  }
+
+  let office = config.get("offices").and_then(Value::as_object).and_then(|o| o.get(office_id));
+  let office_name = office.and_then(|o| o.get("name")).and_then(Value::as_str).unwrap_or(office_id);
+  let office_desc = office.and_then(|o| o.get("description")).and_then(Value::as_str).unwrap_or("");
+
+  let assigned_member_id = task_body.get("assigned_member_id").and_then(Value::as_str).unwrap_or_default();
+  let member = config
+    .get("officeMembers")
+    .and_then(Value::as_object)
+    .and_then(|m| m.get(assigned_member_id));
+  let member_title = member.and_then(|m| m.get("office_title")).and_then(Value::as_str).unwrap_or("执行成员");
+  let member_responsibility = member.and_then(|m| m.get("responsibility")).and_then(Value::as_str).unwrap_or("");
+
+  let permission_policy_id = office
+    .and_then(|o| o.get("default_permission_policy_id"))
+    .and_then(Value::as_str)
+    .unwrap_or_default();
+  let policy = config
+    .get("permissionPolicies")
+    .and_then(Value::as_object)
+    .and_then(|p| p.get(permission_policy_id));
+  let permission_mode = policy
+    .and_then(|p| p.get("default_mode"))
+    .and_then(Value::as_str)
+    .unwrap_or("safe-write");
+
+  let mut section = format!(
+    "[Office Context]\n办公室：{office_name}\n描述：{office_desc}\n你的角色：{member_title}\n职责：{member_responsibility}\n权限模式：{permission_mode}\n"
+  );
+
+  if permission_mode == "read-only" {
+    section.push_str("⚠️ 严禁任何写操作：不得创建、修改、删除文件，不执行改变工作区状态的命令。\n");
+  }
+
+  section.push('\n');
+  section
+}
+
+fn resolve_permission_mode(config: &Value, task: &Value) -> String {
+  let task_body = task.get("task").unwrap_or(task);
+  let office_id = task_body.get("office_id").and_then(Value::as_str).unwrap_or_default();
+  let office = config.get("offices").and_then(Value::as_object).and_then(|o| o.get(office_id));
+  let policy_id = office
+    .and_then(|o| o.get("default_permission_policy_id"))
+    .and_then(Value::as_str)
+    .unwrap_or_default();
+  config
+    .get("permissionPolicies")
+    .and_then(Value::as_object)
+    .and_then(|p| p.get(policy_id))
+    .and_then(|p| p.get("default_mode"))
+    .and_then(Value::as_str)
+    .unwrap_or("safe-write")
+    .to_string()
+}
+
+fn effective_invocation_args(adapter: &CliRuntimeAdapter, permission_mode: &str) -> Vec<String> {
+  adapter
+    .invocation_args
+    .iter()
+    .filter(|arg| {
+      if permission_mode == "read-only" && *arg == &"--dangerously-skip-permissions" {
+        return false;
+      }
+      true
+    })
+    .map(|arg| arg.to_string())
+    .collect()
+}
+
+fn git_status_snapshot(cwd: &Path) -> Option<String> {
+  Command::new("git")
+    .args(["status", "--porcelain"])
+    .current_dir(cwd)
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null())
+    .output()
+    .ok()
+    .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn detect_write_violations(before: &str, after: &str) -> Vec<String> {
+  let before_lines: std::collections::HashSet<&str> = before.lines().collect();
+  after
+    .lines()
+    .filter(|line| !line.trim().is_empty() && !before_lines.contains(line))
+    .map(|line| line.to_string())
+    .collect()
+}
+
+fn build_agent_prompt(config: &Value, task: &Value) -> String {
+  let office_context = build_office_context_section(config, task);
   let task_body = task.get("task").unwrap_or(task);
   let objective = task_body.get("objective").and_then(Value::as_str).unwrap_or("");
   let context = task_body
@@ -1163,7 +1291,7 @@ fn build_agent_prompt(task: &Value) -> String {
   let constraints = value_array_as_lines(task_body.get("constraints"));
 
   format!(
-    "You are executing an Agent Mesh task.\n\nObjective:\n{objective}\n\nContext:\n{context}\n\nAcceptance criteria:\n{acceptance}\n\nConstraints:\n{constraints}\n\nReturn a single JSON object with: status, summary, changed_files, tests, risks, next_steps.\n"
+    "{office_context}[Task]\nObjective:\n{objective}\n\nContext:\n{context}\n\nAcceptance criteria:\n{acceptance}\n\nConstraints:\n{constraints}\n\nReturn a single JSON object with: status, summary, changed_files, tests, risks, next_steps.\n"
   )
 }
 
@@ -2028,6 +2156,7 @@ mod tests {
 
   #[test]
   fn builds_prompt_from_chat_task_fields() {
+    let config = serde_json::json!({});
     let task = serde_json::json!({
       "task": {
         "objective": "Update README",
@@ -2037,7 +2166,7 @@ mod tests {
       }
     });
 
-    let prompt = build_agent_prompt(&task);
+    let prompt = build_agent_prompt(&config, &task);
 
     assert!(prompt.contains("Update README"));
     assert!(prompt.contains("Only inspect docs."));
@@ -2192,5 +2321,94 @@ mod tests {
       ]
     });
     assert_eq!(task_worker_pid(&event_task), Some(2222));
+  }
+
+  #[test]
+  fn builds_prompt_with_office_context_for_readonly_task() {
+    let config = serde_json::json!({
+      "offices": {
+        "office_test": {
+          "id": "office_test",
+          "name": "test",
+          "description": "测试办公室",
+          "default_permission_policy_id": "policy_readonly"
+        }
+      },
+      "officeMembers": {
+        "member_1": {
+          "id": "member_1",
+          "office_id": "office_test",
+          "persona_id": "persona_claude",
+          "office_title": "Claude Code 执行成员",
+          "responsibility": "执行只读代码检查任务"
+        }
+      },
+      "permissionPolicies": {
+        "policy_readonly": {
+          "id": "policy_readonly",
+          "default_mode": "read-only"
+        }
+      }
+    });
+    let task = serde_json::json!({
+      "task": {
+        "office_id": "office_test",
+        "assigned_member_id": "member_1",
+        "objective": "检查项目结构",
+        "context": { "text": "" },
+        "acceptance": ["输出项目描述"],
+        "constraints": []
+      }
+    });
+
+    let prompt = build_agent_prompt(&config, &task);
+
+    assert!(prompt.contains("办公室：test"));
+    assert!(prompt.contains("Claude Code 执行成员"));
+    assert!(prompt.contains("权限模式：read-only"));
+    assert!(prompt.contains("严禁任何写操作"));
+    assert!(prompt.contains("检查项目结构"));
+  }
+
+  #[test]
+  fn effective_args_strips_skip_permissions_in_readonly() {
+    let adapter = cli_adapter_for_runtime("claude-code").unwrap();
+
+    let normal_args = effective_invocation_args(&adapter, "safe-write");
+    assert!(normal_args.contains(&"--dangerously-skip-permissions".to_string()));
+
+    let readonly_args = effective_invocation_args(&adapter, "read-only");
+    assert!(!readonly_args.contains(&"--dangerously-skip-permissions".to_string()));
+    assert!(readonly_args.contains(&"--output-format".to_string()));
+    assert!(readonly_args.contains(&"json".to_string()));
+  }
+
+  #[test]
+  fn detect_write_violations_finds_new_changes() {
+    let before = " M src/old.ts\n?? temp.log\n";
+    let after = " M src/old.ts\n?? temp.log\n M src/new.ts\n?? output.json\n";
+
+    let violations = detect_write_violations(before, after);
+
+    assert_eq!(violations.len(), 2);
+    assert!(violations.contains(&" M src/new.ts".to_string()));
+    assert!(violations.contains(&"?? output.json".to_string()));
+  }
+
+  #[test]
+  fn detect_write_violations_empty_when_no_new_changes() {
+    let before = " M src/old.ts\n";
+    let after = " M src/old.ts\n";
+
+    let violations = detect_write_violations(before, after);
+    assert!(violations.is_empty());
+  }
+
+  #[test]
+  fn resolve_permission_mode_defaults_to_safe_write() {
+    let config = serde_json::json!({});
+    let task = serde_json::json!({ "task": {} });
+
+    assert_eq!(resolve_permission_mode(&config, &task), "safe-write");
   }
 }

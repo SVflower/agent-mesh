@@ -26,8 +26,8 @@ export async function dispatchTask(input: DispatchInput) {
   const { config, agent, envelope } = await prepareDispatch(task, input.agent);
 
   try {
-    if (agent.type !== "claude-cli") {
-      throw new Error(`Unsupported agent type: ${agent.type}`);
+    if (agent.type !== "claude-cli" && agent.type !== "codex-cli") {
+      throw new Error(`Unsupported agent type: ${agent.type}. Supported: claude-cli, codex-cli.`);
     }
 
     const result = await runClaudeTask(task, agent);
@@ -48,8 +48,8 @@ export async function dispatchTaskAsync(input: DispatchInput) {
   const stateFile = await saveEnvelope(config.stateDir, envelope);
 
   try {
-    if (agent.type !== "claude-cli") {
-      throw new Error(`Unsupported agent type: ${agent.type}`);
+    if (agent.type !== "claude-cli" && agent.type !== "codex-cli") {
+      throw new Error(`Unsupported agent type: ${agent.type}. Supported: claude-cli, codex-cli.`);
     }
 
     const child = startWorker(task.id);
@@ -111,7 +111,7 @@ export async function dispatchOfficeTask(input: OfficeDispatchInput) {
   const dispatchInput: DispatchInput = {
     id: taskId,
     objective: buildOfficeObjective(input.objective, office, member, persona),
-    agent: runtime?.kind === "claude-code" ? "claude-code" : "claude-code",
+    agent: resolveAgentForRuntime(runtime),
     repo: input.repo ?? office.default_workspace_path ?? ".",
     context: {
       ...(input.context ?? {}),
@@ -350,6 +350,16 @@ export async function getOfficeStatus(officeId?: string) {
       };
     })
   };
+}
+
+function resolveAgentForRuntime(runtime?: { kind?: string }): string {
+  const kind = runtime?.kind;
+  if (kind === "claude-code") return "claude-code";
+  if (kind === "codex") return "codex";
+  if (!kind) return "claude-code"; // fallback when runtime is unknown
+  throw new Error(
+    `Runtime "${kind}" has no MCP dispatch adapter yet. Use desktop dispatch or implement the adapter.`
+  );
 }
 
 function createTaskFromInput(input: DispatchInput): AcpTask {

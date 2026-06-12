@@ -2,7 +2,7 @@ export type TaskStatus = "created" | "assigned" | "running" | "completed" | "fai
 
 export type AgentConfig = {
   name: string;
-  type: "claude-cli" | "external";
+  type: "claude-cli" | "codex-cli" | "external";
   description?: string;
   command?: string;
   args?: string[];

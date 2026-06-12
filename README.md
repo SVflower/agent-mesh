@@ -44,6 +44,10 @@ Runtime
 - ✅ 异步任务派发与可观测（状态、事件、日志、结果、诊断）
 - ✅ Claude Code adapter 真实验证通过
 - ✅ MCP Server（11 个工具，支持 Hermes 对接）
+- ✅ 办公室上下文注入 Agent prompt（办公室名称、成员角色、权限模式）
+- ✅ read-only 权限强化（自动移除 `--dangerously-skip-permissions`）
+- ✅ 任务执行后 write detection（git status 对比检测违规写入）
+- ✅ MCP dispatch 统一 Office-level contract（不再 hardcode claude-code）
 
 ### 设计中（V0.2 办公室生态）
 
@@ -51,7 +55,7 @@ Runtime
 - 🔲 Agent 团队意识（`get_my_team` / `get_office_context`）
 - 🔲 办公室事件流（`report_to_office` / `broadcast_to_team`）
 - 🔲 办公室独立目录（`team.json` + `events.jsonl`）
-- 🔲 Prompt 自动注入团队上下文
+- 🔲 Prompt 注入完整团队上下文（成员列表、可用团队工具）
 - 🔲 任务调度 DAG 可视化
 
 ## 技术栈
@@ -96,7 +100,7 @@ pnpm test                 # 运行测试
 cargo test                # Rust 测试
 
 # 桌面端开发
-pnpm dev:desktop          # 启动 Tauri 开发窗口（需要 Rust stable）
+pnpm dev:desktop          # 启动 Tauri 桌面窗口（Rust + React，需要 Rust stable）
 
 # MCP Server
 pnpm dev:mcp              # 开发模式（不适合注册到 Hermes）
