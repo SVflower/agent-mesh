@@ -1,14 +1,5 @@
 {
   "channels": {
-    "channel_cli_local": {
-      "enabled": true,
-      "id": "channel_cli_local",
-      "name": "本机 CLI",
-      "office_id": "office_local_dev",
-      "permission_policy_id": "policy_local_safe_dev",
-      "primary_member_id": "member_local_hermes",
-      "type": "cli"
-    },
     "office_test_1781072362758_channel_chat": {
       "enabled": true,
       "id": "office_test_1781072362758_channel_chat",
@@ -16,15 +7,6 @@
       "office_id": "office_test_1781072362758",
       "permission_policy_id": "policy_local_readonly",
       "primary_member_id": "office_test_1781072362758_primary",
-      "type": "agent-mesh-chat"
-    },
-    "office_本地开发办公室_1781244144258_channel_chat": {
-      "enabled": true,
-      "id": "office_本地开发办公室_1781244144258_channel_chat",
-      "name": "Agent Mesh Chat",
-      "office_id": "office_本地开发办公室_1781244144258",
-      "permission_policy_id": "policy_local_safe_dev",
-      "primary_member_id": "office_本地开发办公室_1781244144258_primary",
       "type": "agent-mesh-chat"
     }
   },
@@ -44,33 +26,6 @@
     }
   },
   "officeMembers": {
-    "member_local_claude": {
-      "enabled": true,
-      "id": "member_local_claude",
-      "office_id": "office_local_dev",
-      "office_title": "代码实现 Agent",
-      "persona_id": "persona_claude_code_default",
-      "responsibility": "执行代码实现、仓库分析和审查任务。",
-      "role": "collaborator"
-    },
-    "member_local_codex": {
-      "enabled": true,
-      "id": "member_local_codex",
-      "office_id": "office_local_dev",
-      "office_title": "规划与验证 Agent",
-      "persona_id": "persona_codex_default",
-      "responsibility": "负责方案整理、代码修改、测试和文档更新。",
-      "role": "collaborator"
-    },
-    "member_local_hermes": {
-      "enabled": true,
-      "id": "member_local_hermes",
-      "office_id": "office_local_dev",
-      "office_title": "主入口与任务路由",
-      "persona_id": "persona_hermes_feishu_primary",
-      "responsibility": "接收飞书或 CLI 指令，派发给协作 Agent，并回传进度。",
-      "role": "primary"
-    },
     "office_test_1781072362758_member_1": {
       "enabled": true,
       "id": "office_test_1781072362758_member_1",
@@ -88,102 +43,9 @@
       "persona_id": "persona_hermes_feishu_primary",
       "responsibility": "接收用户或渠道任务，负责分派与状态回传。",
       "role": "primary"
-    },
-    "office_本地开发办公室_1781244144258_member_1": {
-      "enabled": true,
-      "id": "office_本地开发办公室_1781244144258_member_1",
-      "office_id": "office_本地开发办公室_1781244144258",
-      "office_title": "协作 Agent",
-      "persona": {
-        "capabilities": [
-          "code.implement",
-          "code.review",
-          "repo.inspect"
-        ],
-        "description": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
-        "enabled": true,
-        "id": "persona_claude_code_default",
-        "mcp_bindings": [
-          "mcp_agent_mesh"
-        ],
-        "name": "default",
-        "profile_key": "default",
-        "runtime_id": "runtime_claude_code",
-        "skills": [
-          "code.implement",
-          "code.review",
-          "repo.inspect"
-        ],
-        "source": "default"
-      },
-      "persona_id": "persona_claude_code_default",
-      "responsibility": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
-      "role": "collaborator",
-      "runtime": {
-        "command": "claude.cmd",
-        "connection_type": "cli",
-        "health": "unknown",
-        "id": "runtime_claude_code",
-        "installed": false,
-        "kind": "claude-code",
-        "name": "Claude Code",
-        "notes": "适合代码实现、仓库分析、审查与长任务执行。"
-      }
-    },
-    "office_本地开发办公室_1781244144258_primary": {
-      "enabled": true,
-      "id": "office_本地开发办公室_1781244144258_primary",
-      "office_id": "office_本地开发办公室_1781244144258",
-      "office_title": "Captain / 主 Agent",
-      "persona": {
-        "capabilities": [
-          "assistant.general",
-          "browser.operate",
-          "workflow.automate"
-        ],
-        "description": "OpenClaw 内的 AI 助手 Persona，适合网页操作、信息整理和流程自动化。",
-        "enabled": true,
-        "id": "persona_openclaw_huajuan",
-        "mcp_bindings": [],
-        "name": "花卷",
-        "profile_key": "huajuan",
-        "runtime_id": "runtime_openclaw",
-        "skills": [
-          "browser.operate",
-          "workflow.automate",
-          "summary.write"
-        ],
-        "source": "default"
-      },
-      "persona_id": "persona_openclaw_huajuan",
-      "responsibility": "接收用户任务，拆解、路由、汇总团队结果。",
-      "role": "primary",
-      "runtime": {
-        "command": "openclaw",
-        "connection_type": "desktop",
-        "health": "unknown",
-        "id": "runtime_openclaw",
-        "installed": false,
-        "kind": "openclaw",
-        "name": "OpenClaw",
-        "notes": "第一阶段先手动维护 Persona，后续再做 OpenClaw 内部多 Agent 自动发现。"
-      }
     }
   },
   "offices": {
-    "office_local_dev": {
-      "created_at": "2026-06-09T00:00:00.000Z",
-      "default_channel_id": "channel_cli_local",
-      "default_permission_policy_id": "policy_local_safe_dev",
-      "default_routing_policy_id": "routing_local_code",
-      "default_task_type_id": "task_type_code_implementation",
-      "default_workspace_path": ".",
-      "description": "用于本机代码、文档和长任务协作的默认办公室。",
-      "id": "office_local_dev",
-      "name": "本地开发办公室",
-      "paused": false,
-      "updated_at": "2026-06-09T00:00:00.000Z"
-    },
     "office_test_1781072362758": {
       "created_at": "2026-06-10T06:19:22.758Z",
       "default_channel_id": "office_test_1781072362758_channel_chat",
@@ -196,112 +58,6 @@
       "name": "test",
       "paused": false,
       "updated_at": "2026-06-10T06:19:22.758Z"
-    },
-    "office_本地开发办公室_1781244144258": {
-      "channels": [
-        {
-          "enabled": true,
-          "id": "office_本地开发办公室_1781244144258_channel_chat",
-          "name": "Agent Mesh Chat",
-          "office_id": "office_本地开发办公室_1781244144258",
-          "permission_policy_id": "policy_local_safe_dev",
-          "primary_member_id": "office_本地开发办公室_1781244144258_primary",
-          "type": "agent-mesh-chat"
-        }
-      ],
-      "created_at": "2026-06-12T06:02:24.257Z",
-      "default_channel_id": "office_本地开发办公室_1781244144258_channel_chat",
-      "default_permission_policy_id": "policy_local_safe_dev",
-      "default_routing_policy_id": "routing_office_本地开发办公室_1781244144258_default",
-      "default_task_type_id": "task_type_office_本地开发办公室_1781244144258_default",
-      "default_workspace_path": ".",
-      "description": "用于本机代码、文档和长任务协作的办公室。",
-      "id": "office_本地开发办公室_1781244144258",
-      "members": [
-        {
-          "enabled": true,
-          "id": "office_本地开发办公室_1781244144258_member_1",
-          "office_id": "office_本地开发办公室_1781244144258",
-          "office_title": "协作 Agent",
-          "persona": {
-            "capabilities": [
-              "code.implement",
-              "code.review",
-              "repo.inspect"
-            ],
-            "description": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
-            "enabled": true,
-            "id": "persona_claude_code_default",
-            "mcp_bindings": [
-              "mcp_agent_mesh"
-            ],
-            "name": "default",
-            "profile_key": "default",
-            "runtime_id": "runtime_claude_code",
-            "skills": [
-              "code.implement",
-              "code.review",
-              "repo.inspect"
-            ],
-            "source": "default"
-          },
-          "persona_id": "persona_claude_code_default",
-          "responsibility": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
-          "role": "collaborator",
-          "runtime": {
-            "command": "claude.cmd",
-            "connection_type": "cli",
-            "health": "unknown",
-            "id": "runtime_claude_code",
-            "installed": false,
-            "kind": "claude-code",
-            "name": "Claude Code",
-            "notes": "适合代码实现、仓库分析、审查与长任务执行。"
-          }
-        },
-        {
-          "enabled": true,
-          "id": "office_本地开发办公室_1781244144258_primary",
-          "office_id": "office_本地开发办公室_1781244144258",
-          "office_title": "Captain / 主 Agent",
-          "persona": {
-            "capabilities": [
-              "assistant.general",
-              "browser.operate",
-              "workflow.automate"
-            ],
-            "description": "OpenClaw 内的 AI 助手 Persona，适合网页操作、信息整理和流程自动化。",
-            "enabled": true,
-            "id": "persona_openclaw_huajuan",
-            "mcp_bindings": [],
-            "name": "花卷",
-            "profile_key": "huajuan",
-            "runtime_id": "runtime_openclaw",
-            "skills": [
-              "browser.operate",
-              "workflow.automate",
-              "summary.write"
-            ],
-            "source": "default"
-          },
-          "persona_id": "persona_openclaw_huajuan",
-          "responsibility": "接收用户任务，拆解、路由、汇总团队结果。",
-          "role": "primary",
-          "runtime": {
-            "command": "openclaw",
-            "connection_type": "desktop",
-            "health": "unknown",
-            "id": "runtime_openclaw",
-            "installed": false,
-            "kind": "openclaw",
-            "name": "OpenClaw",
-            "notes": "第一阶段先手动维护 Persona，后续再做 OpenClaw 内部多 Agent 自动发现。"
-          }
-        }
-      ],
-      "name": "方法",
-      "paused": false,
-      "updated_at": "2026-06-12T07:11:44.437Z"
     }
   },
   "permissionPolicies": {
@@ -479,56 +235,6 @@
     }
   },
   "routingPolicies": {
-    "routing_local_browser": {
-      "enabled": true,
-      "fallback_member_id": "member_local_hermes",
-      "id": "routing_local_browser",
-      "name": "浏览器任务优先",
-      "office_id": "office_local_dev",
-      "preferred_member_ids": [
-        "member_local_hermes"
-      ],
-      "required_capabilities": [
-        "browser.operate",
-        "ui.inspect"
-      ],
-      "strategy": "capability-match",
-      "task_type_id": "task_type_browser_automation"
-    },
-    "routing_local_code": {
-      "enabled": true,
-      "fallback_member_id": "member_local_claude",
-      "id": "routing_local_code",
-      "name": "本地代码任务优先",
-      "office_id": "office_local_dev",
-      "preferred_member_ids": [
-        "member_local_claude",
-        "member_local_codex"
-      ],
-      "required_capabilities": [
-        "code.implement",
-        "repo.inspect"
-      ],
-      "strategy": "capability-match",
-      "task_type_id": "task_type_code_implementation"
-    },
-    "routing_local_docs": {
-      "enabled": true,
-      "fallback_member_id": "member_local_codex",
-      "id": "routing_local_docs",
-      "name": "规划文档任务优先",
-      "office_id": "office_local_dev",
-      "preferred_member_ids": [
-        "member_local_codex",
-        "member_local_claude"
-      ],
-      "required_capabilities": [
-        "docs.write",
-        "task.plan"
-      ],
-      "strategy": "capability-match",
-      "task_type_id": "task_type_plan_docs"
-    },
     "routing_office_test_1781072362758_readonly_repo_inspect": {
       "enabled": true,
       "fallback_member_id": "office_test_1781072362758_member_1",
@@ -543,19 +249,6 @@
       ],
       "strategy": "capability-match",
       "task_type_id": "task_type_office_test_1781072362758_readonly_repo_inspect"
-    },
-    "routing_office_本地开发办公室_1781244144258_default": {
-      "enabled": true,
-      "fallback_member_id": "office_本地开发办公室_1781244144258_member_1",
-      "id": "routing_office_本地开发办公室_1781244144258_default",
-      "name": "AI 推荐路由",
-      "office_id": "office_本地开发办公室_1781244144258",
-      "preferred_member_ids": [
-        "office_本地开发办公室_1781244144258_member_1"
-      ],
-      "required_capabilities": [],
-      "strategy": "capability-match",
-      "task_type_id": "task_type_office_本地开发办公室_1781244144258_default"
     }
   },
   "runtimes": {
@@ -690,21 +383,6 @@
       "required_capabilities": [
         "repo.inspect"
       ]
-    },
-    "task_type_office_本地开发办公室_1781244144258_default": {
-      "default_acceptance": [
-        "说明执行结论",
-        "列出关键发现",
-        "标明风险和后续建议"
-      ],
-      "default_constraints": [
-        "遵守办公室权限策略"
-      ],
-      "description": "从统一入口创建的可观测办公室任务。",
-      "enabled": true,
-      "id": "task_type_office_本地开发办公室_1781244144258_default",
-      "name": "默认协作任务",
-      "required_capabilities": []
     },
     "task_type_plan_docs": {
       "default_acceptance": [

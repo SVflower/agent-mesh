@@ -1,6 +1,7 @@
 import type { LogTail, TaskSummary } from '../types/agentMesh'
 
-const MOJIBAKE_PATTERN = /(?:\?{3,}|�|涓|鍚|鐨|鏄|鍔|瀹|绛|浠|犻|勫|佃|卞|傛|€)/
+const MOJIBAKE_MARKER_PATTERN = /(?:�|\?{3,})/
+const MOJIBAKE_TOKENS = ['涓', '鍚', '鐨', '鏄', '鍔', '瀹', '绛', '浠', '犻', '勫', '佃', '卞', '傛']
 
 export function formatDate(value?: string) {
   if (!value) return '-'
@@ -19,8 +20,8 @@ export function shortPath(path: string) {
 }
 
 export function safeDisplayText(value: unknown, fallback = '内容不可读') {
-  const text = typeof value === 'string' ? value.trim() : ''
-  if (!text || MOJIBAKE_PATTERN.test(text)) return fallback
+  const text = typeof value === 'string' ? value.trim() : String(value ?? '').trim()
+  if (!text || containsMojibake(text)) return fallback
   return text
 }
 
@@ -110,6 +111,14 @@ function inferObjectiveFromTaskId(taskId: string) {
   return '任务目标不可读'
 }
 
+function containsMojibake(text: string) {
+  if (MOJIBAKE_MARKER_PATTERN.test(text)) return true
+
+  // 单个字符如“涓”可能是正常中文，至少命中两个典型片段才判定为乱码。
+  const tokenHits = MOJIBAKE_TOKENS.reduce((count, token) => count + (text.includes(token) ? 1 : 0), 0)
+  return tokenHits >= 2
+}
+
 function tryParseJsonLine(line: string) {
   const jsonStart = line.indexOf('{')
   if (jsonStart < 0) return null
@@ -145,6 +154,23 @@ function getLastTaskActivity(task: TaskSummary, detail: Record<string, unknown> 
     .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())
 
   return candidates[0] ?? task.updated_at ?? task.created_at
+}
+
+function summarizeWriteCheck(detail: Record<string, unknown>) {
+  const result = asRecord(detail.result)
+  const violations = stringArray(result?.write_violations)
+  const changed = stringArray(result?.changed_files)
+  if (violations.length > 0) return `越权: ${violations.join(', ')}`
+  if (changed.length > 0) return `变更: ${changed.join(', ')}`
+  const status = textValue(result?.write_detection_status)
+  if (status === 'passed') return '通过'
+  if (status === 'unavailable') return '未能确认'
+  if (status === 'violated') return '越权检测已触发'
+  // 从 events 日志推断
+  const permissionDecision = asRecord(detail.permissionDecision)
+  const writeDetectionRequired = permissionDecision?.write_detection_required
+  if (writeDetectionRequired === true) return '检测中（待结果）'
+  return undefined
 }
 
 function extractNewestIsoTimestamp(text: string) {
