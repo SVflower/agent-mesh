@@ -1,5 +1,5 @@
-import { type ReactElement, useEffect, useMemo, useState } from 'react'
-import { LogPreview, Status } from '../../components/common'
+﻿import { type ReactElement, useEffect, useMemo, useState } from 'react'
+import { EmptyState, ErrorNotice, LoadingState, LogPreview, Status } from '../../components/common'
 import { agentMeshApi } from '../../services/agentMeshApi'
 import type { AgentMeshConfig, LogTail, Office, OfficeMember, RoutingPolicy, TaskSessionStatus, TaskSummary, TaskType } from '../../types/agentMesh'
 import { extractResultSummary, formatDate, getTaskDiagnostics, taskObjectiveLabel } from '../../utils/taskDisplay'
@@ -184,8 +184,8 @@ export function TasksPage({ config, offices, t }: { config: AgentMeshConfig; off
               </div>
               <Status value={selectedTask?.status ?? 'standby'} label={selectedTask?.status ?? 'none'} />
             </div>
-            {loading ? <SkeletonRows /> : null}
-            {error ? <div className="errorNotice compact"><strong>加载失败</strong><button onClick={() => void refreshTasks()}>重试</button><span>{error}</span></div> : null}
+            {loading ? <LoadingState compact title="Loading tasks" description="Reading task records from .agent-mesh/tasks." /> : null}
+            {error ? <ErrorNotice compact title="Load failed" actionLabel="Retry" message={error} onAction={() => void refreshTasks()} /> : null}
             {!loading && !error ? (
               <div className="dispatchTaskList">
                 {tasks.slice(0, 12).map((task) => (
@@ -197,7 +197,14 @@ export function TasksPage({ config, offices, t }: { config: AgentMeshConfig; off
                     <TaskActions task={task} onAction={runTaskAction} onReport={setReportTask} />
                   </div>
                 ))}
-                {tasks.length === 0 ? <EmptyState title="还没有任务" action="发布第一个任务" onAction={() => void publishTask()} /> : null}
+                {tasks.length === 0 ? (
+                  <EmptyState
+                    actionLabel="Publish first task"
+                    description="Dispatch a task to see routing, tool calls, and logs here."
+                    onAction={() => void publishTask()}
+                    title="No tasks yet"
+                  />
+                ) : null}
               </div>
             ) : null}
           </section>
@@ -205,7 +212,7 @@ export function TasksPage({ config, offices, t }: { config: AgentMeshConfig; off
           <section className="inspectorPanel">
             <p className="eyebrow">TOOLS</p>
             <h2>工具调用</h2>
-            {detailLoading ? <SkeletonRows /> : (
+            {detailLoading ? <LoadingState compact title="Loading task detail" description="Syncing events, session status, and log output." /> : (
               <div className="toolCallList">
                 {diagnostics.map((row) => (
                   <details key={row.label}>
@@ -271,26 +278,6 @@ function FlowLine({ label }: { label: string }) {
   return (
     <div className="flowLine">
       <span>{label}</span>
-    </div>
-  )
-}
-
-function SkeletonRows() {
-  return (
-    <div className="skeletonList">
-      <span />
-      <span />
-      <span />
-    </div>
-  )
-}
-
-function EmptyState({ title, action, onAction }: { title: string; action: string; onAction: () => void }) {
-  return (
-    <div className="emptyCta">
-      <strong>{title}</strong>
-      <span>任务创建后会在这里显示调度流程、工具调用和日志。</span>
-      <button onClick={onAction}>{action}</button>
     </div>
   )
 }

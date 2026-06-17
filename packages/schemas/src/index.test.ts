@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   AgentMeshConfigSchema,
+  OfficeCaptainStateSchema,
+  OfficeEventSchema,
   OfficeMemberSchema,
+  OfficeSchema,
   PersonaSchema,
   RoutingPolicySchema,
   RuntimeSchema,
@@ -45,6 +48,53 @@ describe("schemas", () => {
     });
 
     expect(member.enabled).toBe(true);
+    expect(member.can_be_captain).toBe(true);
+    expect(member.health).toBe("unknown");
+  });
+
+  it("validates office runtime context fields", () => {
+    const office = OfficeSchema.parse({
+      id: "office_dev",
+      name: "本地开发办公室",
+      context_dir: ".agent-mesh/offices/office_dev",
+      team_file_path: ".agent-mesh/offices/office_dev/team.json",
+      event_log_path: ".agent-mesh/offices/office_dev/events.jsonl",
+      project_context: {
+        repo_paths: ["D:/IDEA/workspace/agent-mesh"],
+        key_docs: ["docs/roadmap.md"],
+        tags: ["local", "desktop"]
+      }
+    });
+
+    expect(office.project_context?.repo_paths).toEqual(["D:/IDEA/workspace/agent-mesh"]);
+    expect(office.project_context?.key_docs).toEqual(["docs/roadmap.md"]);
+  });
+
+  it("validates runtime captain state", () => {
+    const captain = OfficeCaptainStateSchema.parse({
+      office_id: "office_dev",
+      current_captain_member_id: "member_primary",
+      promoted_at: new Date().toISOString(),
+      promoted_by: "channel_entry",
+      source_channel_id: "channel_chat"
+    });
+
+    expect(captain.current_captain_member_id).toBe("member_primary");
+  });
+
+  it("validates office event payload", () => {
+    const event = OfficeEventSchema.parse({
+      id: "event_1",
+      office_id: "office_dev",
+      type: "context_updated",
+      message: "办公室上下文已刷新",
+      created_at: new Date().toISOString(),
+      data: {
+        repo_paths: ["D:/IDEA/workspace/agent-mesh"]
+      }
+    });
+
+    expect(event.data.repo_paths).toEqual(["D:/IDEA/workspace/agent-mesh"]);
   });
 
   it("validates an async task with default status", () => {

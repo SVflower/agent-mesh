@@ -5,6 +5,7 @@ import { agentMeshApi } from '../../services/agentMeshApi'
 import type { AgentMeshConfig, Channel, Office, OfficeMember, PermissionMode, Persona, RuntimeAsset, RuntimeKind, RoutingPolicy, TaskType } from '../../types/agentMesh'
 import { displayChannelName, displayPermissionName, displayRoutingName } from '../../utils/displayNames'
 import { formatDate } from '../../utils/taskDisplay'
+import { Metric, OfficeOrbit, OfficePreview, orbitStyle, runtimeKindOf, runtimeLabel } from './OfficeVisuals'
 
 type PageId = 'dashboard' | 'offices' | 'office-create' | 'office-detail' | 'agents' | 'tasks' | 'chat' | 'settings'
 type Translator = (key: string) => string
@@ -564,120 +565,10 @@ export function OfficeCreatePage({
   )
 }
 
-function OfficeOrbit({ members, primary, large = false }: { members: OfficeMember[]; primary?: OfficeMember; large?: boolean }) {
-  const workers = members.filter((member) => member.id !== primary?.id)
-  const visibleWorkers = workers.slice(0, 6)
-  const overflow = Math.max(0, workers.length - visibleWorkers.length)
-
-  return (
-    <div className={large ? 'officeOrbit large' : 'officeOrbit'}>
-      <div className="captainNode">
-        <AgentLogo kind={runtimeKindOfMember(primary)} />
-        <strong>{primary?.persona?.name ?? 'Captain'}</strong>
-        <small>主控</small>
-      </div>
-      {visibleWorkers.map((member, index) => (
-        <div className="orbitMember" style={orbitStyle(index, visibleWorkers.length)} key={member.id} title={`${member.office_title}: ${member.responsibility ?? ''}`}>
-          <AgentLogo kind={runtimeKindOfMember(member)} compact />
-          <span>{member.persona?.name ?? member.persona_id}</span>
-        </div>
-      ))}
-      {overflow > 0 ? <div className="orbitOverflow">+{overflow}</div> : null}
-    </div>
-  )
-}
-
-function OfficePreview({ office, onOpenDetail }: { office: Office; onOpenDetail: (officeId: string) => void }) {
-  const members = office.members ?? []
-  const primary = members.find((member) => member.role === 'primary') ?? members[0]
-
-  return (
-    <div className="officeSummaryCard">
-      <div className="officeSummaryHeader">
-        <div>
-          <p className="eyebrow">SELECTED OFFICE</p>
-          <h2>{office.name}</h2>
-          <p className="officeSummaryDesc">{office.description || '本地 Agent 团队'}</p>
-        </div>
-        <Status value={office.paused ? 'standby' : 'online'} label={office.paused ? '暂停' : '在线'} />
-      </div>
-
-      <div className="officeSummaryBody">
-        <OfficeOrbit members={members} primary={primary} large />
-      </div>
-
-      <div className="officeSummaryStats">
-        <div className="summaryStat">
-          <small>成员数量</small>
-          <strong>{members.length}</strong>
-        </div>
-        <div className="summaryStat">
-          <small>主 Agent</small>
-          <strong>{primary?.persona?.name ?? '-'}</strong>
-        </div>
-        <div className="summaryStat">
-          <small>工作目录</small>
-          <strong>{office.default_workspace_path ?? '.'}</strong>
-        </div>
-      </div>
-
-      <div className="officeSummaryPolicies">
-        <Metric label="Channel" value={displayChannelName(office.default_channel_id)} raw={office.default_channel_id} />
-        <Metric label="Permission" value={displayPermissionName(office.default_permission_policy_id)} raw={office.default_permission_policy_id} />
-        <Metric label="Routing" value={displayRoutingName(office.default_routing_policy_id)} raw={office.default_routing_policy_id} />
-      </div>
-
-      <div className="officeSummaryActions">
-        <button onClick={() => onOpenDetail(office.id)}>查看详情</button>
-      </div>
-    </div>
-  )
-}
-
-function Metric({ label, value, raw }: { label: string; value: string; raw?: string }) {
-  return (
-    <div className="metricTile" title={raw}>
-      <small>{label}</small>
-      <strong>{value}</strong>
-      {raw && raw !== value ? <span className="debugId">{raw}</span> : null}
-    </div>
-  )
-}
-
-function orbitStyle(index: number, count: number) {
-  const total = count <= 3 ? Math.max(count, 3) : Math.min(count, 6)
-  const angle = -90 + (360 / total) * index
-  const radius = count <= 3 ? 35 : 39
-  return {
-    left: `${50 + Math.cos((angle * Math.PI) / 180) * radius}%`,
-    top: `${50 + Math.sin((angle * Math.PI) / 180) * radius}%`,
-    transform: 'translate(-50%, -50%)',
-  }
-}
-
 function permissionPolicyId(mode: PermissionMode) {
   if (mode === 'read-only') return 'policy_local_readonly'
   if (mode === 'full-access') return 'policy_local_full_access'
   return 'policy_local_safe_dev'
-}
-
-function runtimeKindOf(persona?: Persona): RuntimeKind {
-  if (!persona) return 'hermes'
-  if (persona.runtime?.kind) return persona.runtime.kind
-  if (persona.runtime_id.includes('openclaw')) return 'openclaw'
-  if (persona.runtime_id.includes('codex')) return 'codex'
-  if (persona.runtime_id.includes('claude')) return 'claude-code'
-  return 'hermes'
-}
-
-function runtimeKindOfMember(member?: OfficeMember): RuntimeKind {
-  return runtimeKindOf(member?.persona)
-}
-
-function runtimeLabel(kind: RuntimeKind) {
-  if (kind === 'claude-code') return 'Claude Code'
-  if (kind === 'openclaw') return 'OpenClaw'
-  return kind[0].toUpperCase() + kind.slice(1)
 }
 
 function slugify(value: string) {

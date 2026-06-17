@@ -4,6 +4,7 @@
     "subtitle": "本地 Agent 办公室"
   },
   "nav": {
+    "dashboard": "仪表盘",
     "offices": "办公室",
     "agents": "Agent 资产",
     "tasks": "任务",
@@ -25,7 +26,8 @@
   },
   "init": {
     "backgroundTitle": "正在检测本机 Agent Runtime",
-    "backgroundDescription": "当前阶段只检测 Hermes、OpenClaw、Codex、Claude Code 四个产品，并在创建办公室时提供选择。"
+    "backgroundDescription": "当前阶段只检测 Hermes、OpenClaw、Codex、Claude Code 四个产品，并在创建办公室时提供选择。",
+    "errorTitle": "初始化失败"
   },
   "offices": {
     "title": "办公室控制台",

@@ -13,7 +13,18 @@ import {
   listTasks,
   resetSession
 } from "./dispatcher.js";
-import type { DispatchInput, OfficeDispatchInput } from "./types.js";
+import { getMyTeam, getOfficeContext } from "./team.js";
+import { upgradeToCaptain } from "./captain.js";
+import { broadcastToTeam, reportToOffice } from "./office-events.js";
+import type {
+  BroadcastToTeamInput,
+  DispatchInput,
+  GetMyTeamInput,
+  GetOfficeContextInput,
+  OfficeDispatchInput,
+  ReportToOfficeInput,
+  UpgradeToCaptainInput
+} from "./types.js";
 
 const serverInfo = {
   name: "agent-mesh",
@@ -211,6 +222,139 @@ export const tools = [
     }
   },
   {
+    name: "get_my_team",
+    description: "Query which office I belong to, who my teammates are, and who is the current captain.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: {
+          type: "string",
+          description: "Member id or persona id. If omitted, returns all offices."
+        },
+        officeId: {
+          type: "string",
+          description: "Optional office id filter."
+        }
+      }
+    }
+  },
+  {
+    name: "get_office_context",
+    description: "Get the shared context of an office: project background, active tasks, captain, and recent office events.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        officeId: {
+          type: "string",
+          description: "Office id to query."
+        },
+        includeTasks: {
+          type: "boolean",
+          description: "Whether to include active task summaries. Defaults to true."
+        },
+        includeEvents: {
+          type: "boolean",
+          description: "Whether to include recent office events. Defaults to true."
+        },
+        eventLimit: {
+          type: "number",
+          description: "Maximum number of recent office events. Defaults to 20."
+        }
+      },
+      required: ["officeId"]
+    }
+  },
+  {
+    name: "upgrade_to_captain",
+    description: "Promote an office member to be the current captain for this office.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        officeId: {
+          type: "string",
+          description: "Office id to update."
+        },
+        memberId: {
+          type: "string",
+          description: "Member id or persona id to promote. Defaults to the office primary member."
+        },
+        reason: {
+          type: "string",
+          enum: ["channel_entry", "self_upgrade", "delegation", "manual"],
+          description: "Why the captain switch happened."
+        },
+        sourceChannelId: {
+          type: "string",
+          description: "Optional channel id that triggered the promotion."
+        }
+      },
+      required: ["officeId"]
+    }
+  },
+  {
+    name: "report_to_office",
+    description: "Report a progress event, completion, failure, or context update back to the office event stream.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        officeId: {
+          type: "string",
+          description: "Office id to report into."
+        },
+        fromMemberId: {
+          type: "string",
+          description: "Optional reporting member id or persona id."
+        },
+        eventType: {
+          type: "string",
+          enum: ["progress_report", "task_completed", "task_failed", "context_updated", "broadcast"],
+          description: "Type of office event."
+        },
+        message: {
+          type: "string",
+          description: "Human-readable event message."
+        },
+        data: {
+          type: "object",
+          description: "Optional structured event payload."
+        }
+      },
+      required: ["officeId", "eventType", "message"]
+    }
+  },
+  {
+    name: "broadcast_to_team",
+    description: "Broadcast a message to all or a subset of enabled office members.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        officeId: {
+          type: "string",
+          description: "Office id to broadcast into."
+        },
+        fromMemberId: {
+          type: "string",
+          description: "Optional sender member id or persona id."
+        },
+        message: {
+          type: "string",
+          description: "Broadcast message content."
+        },
+        urgency: {
+          type: "string",
+          enum: ["info", "action_needed", "blocking"],
+          description: "Urgency level."
+        },
+        targetMembers: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional subset of member ids."
+        }
+      },
+      required: ["officeId", "message"]
+    }
+  },
+  {
     name: "get_task_log_tail",
     description: "Read the tail of a task stdout or stderr log.",
     inputSchema: {
@@ -387,6 +531,26 @@ export async function callTool(params: any) {
 
   if (params?.name === "get_office_status") {
     return toolResult(await getOfficeStatus(params.arguments?.id));
+  }
+
+  if (params?.name === "get_my_team") {
+    return toolResult(await getMyTeam(params.arguments as GetMyTeamInput));
+  }
+
+  if (params?.name === "get_office_context") {
+    return toolResult(await getOfficeContext(params.arguments as GetOfficeContextInput));
+  }
+
+  if (params?.name === "upgrade_to_captain") {
+    return toolResult(await upgradeToCaptain(params.arguments as UpgradeToCaptainInput));
+  }
+
+  if (params?.name === "report_to_office") {
+    return toolResult(await reportToOffice(params.arguments as ReportToOfficeInput));
+  }
+
+  if (params?.name === "broadcast_to_team") {
+    return toolResult(await broadcastToTeam(params.arguments as BroadcastToTeamInput));
   }
 
   if (params?.name === "get_task_log_tail") {

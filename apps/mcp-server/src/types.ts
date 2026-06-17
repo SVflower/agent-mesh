@@ -74,6 +74,16 @@ export type DesktopOffice = {
   default_task_type_id?: string;
   default_routing_policy_id?: string;
   default_workspace_path?: string;
+  context_dir?: string;
+  team_file_path?: string;
+  event_log_path?: string;
+  project_context?: {
+    name?: string;
+    description?: string;
+    repo_paths?: string[];
+    key_docs?: string[];
+    tags?: string[];
+  };
   paused?: boolean;
 };
 
@@ -85,6 +95,60 @@ export type DesktopOfficeMember = {
   office_title: string;
   responsibility?: string;
   enabled?: boolean;
+  can_be_captain?: boolean;
+  health?: "unknown" | "online" | "offline" | "busy";
+  last_active_at?: string;
+};
+
+export type OfficeCaptainState = {
+  office_id: string;
+  current_captain_member_id: string;
+  promoted_at: string;
+  promoted_by: "channel_entry" | "self_upgrade" | "manual" | "system";
+  source_channel_id?: string;
+  previous_captain_member_id?: string;
+};
+
+export type OfficeEvent = {
+  id: string;
+  office_id: string;
+  type:
+    | "captain_promoted"
+    | "member_joined"
+    | "member_left"
+    | "task_assigned"
+    | "task_completed"
+    | "task_failed"
+    | "progress_report"
+    | "broadcast"
+    | "context_updated";
+  from_member_id?: string;
+  to_member_id?: string;
+  message?: string;
+  data: Record<string, unknown>;
+  created_at: string;
+};
+
+export type OfficeTeamMemberSnapshot = {
+  member_id: string;
+  persona_id?: string;
+  persona_name?: string;
+  runtime_id?: string;
+  runtime_kind?: DesktopRuntime["kind"];
+  role?: DesktopOfficeMember["role"];
+  office_title?: string;
+  responsibility?: string;
+  enabled?: boolean;
+  can_be_captain?: boolean;
+  health?: "unknown" | "online" | "offline" | "busy";
+  last_active_at?: string;
+};
+
+export type OfficeTeamSnapshot = {
+  office_id: string;
+  current_captain: OfficeCaptainState | null;
+  members: OfficeTeamMemberSnapshot[];
+  updated_at: string;
 };
 
 export type DesktopPermissionPolicy = {
@@ -221,4 +285,39 @@ export type OfficeDispatchInput = {
   acceptance?: string[];
   mode?: "async" | "sync";
   readOnly?: boolean;
+};
+
+export type GetMyTeamInput = {
+  agentId?: string;
+  officeId?: string;
+};
+
+export type GetOfficeContextInput = {
+  officeId: string;
+  includeTasks?: boolean;
+  includeEvents?: boolean;
+  eventLimit?: number;
+};
+
+export type UpgradeToCaptainInput = {
+  officeId: string;
+  memberId?: string;
+  reason?: "channel_entry" | "self_upgrade" | "delegation" | "manual";
+  sourceChannelId?: string;
+};
+
+export type ReportToOfficeInput = {
+  officeId: string;
+  fromMemberId?: string;
+  eventType: "progress_report" | "task_completed" | "task_failed" | "context_updated" | "broadcast";
+  message: string;
+  data?: Record<string, unknown>;
+};
+
+export type BroadcastToTeamInput = {
+  officeId: string;
+  fromMemberId?: string;
+  message: string;
+  urgency?: "info" | "action_needed" | "blocking";
+  targetMembers?: string[];
 };

@@ -8,6 +8,15 @@
       "permission_policy_id": "policy_local_readonly",
       "primary_member_id": "office_test_1781072362758_primary",
       "type": "agent-mesh-chat"
+    },
+    "office_本地开发办公室_1781664688208_channel_chat": {
+      "enabled": true,
+      "id": "office_本地开发办公室_1781664688208_channel_chat",
+      "name": "Agent Mesh Chat",
+      "office_id": "office_本地开发办公室_1781664688208",
+      "permission_policy_id": "policy_local_safe_dev",
+      "primary_member_id": "office_本地开发办公室_1781664688208_primary",
+      "type": "agent-mesh-chat"
     }
   },
   "mcpBindings": {
@@ -43,6 +52,88 @@
       "persona_id": "persona_hermes_feishu_primary",
       "responsibility": "接收用户或渠道任务，负责分派与状态回传。",
       "role": "primary"
+    },
+    "office_本地开发办公室_1781664688208_member_1": {
+      "enabled": true,
+      "id": "office_本地开发办公室_1781664688208_member_1",
+      "office_id": "office_本地开发办公室_1781664688208",
+      "office_title": "协作 Agent",
+      "persona": {
+        "capabilities": [
+          "code.implement",
+          "code.review",
+          "repo.inspect"
+        ],
+        "description": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
+        "enabled": true,
+        "id": "persona_claude_code_default",
+        "mcp_bindings": [
+          "mcp_agent_mesh"
+        ],
+        "name": "default",
+        "profile_key": "default",
+        "runtime_id": "runtime_claude_code",
+        "skills": [
+          "code.implement",
+          "code.review",
+          "repo.inspect"
+        ],
+        "source": "default"
+      },
+      "persona_id": "persona_claude_code_default",
+      "responsibility": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
+      "role": "collaborator",
+      "runtime": {
+        "command": "claude.cmd",
+        "connection_type": "cli",
+        "health": "unknown",
+        "id": "runtime_claude_code",
+        "installed": false,
+        "kind": "claude-code",
+        "name": "Claude Code",
+        "notes": "适合代码实现、仓库分析、审查与长任务执行。"
+      }
+    },
+    "office_本地开发办公室_1781664688208_primary": {
+      "enabled": true,
+      "id": "office_本地开发办公室_1781664688208_primary",
+      "office_id": "office_本地开发办公室_1781664688208",
+      "office_title": "Captain / 主 Agent",
+      "persona": {
+        "capabilities": [
+          "channel.feishu",
+          "task.request",
+          "mcp.client"
+        ],
+        "description": "面向飞书入口的 Hermes profile，用于接收远程任务和回传进度。",
+        "enabled": true,
+        "id": "persona_hermes_feishu_primary",
+        "mcp_bindings": [
+          "mcp_agent_mesh"
+        ],
+        "name": "feishu-primary",
+        "profile_key": "feishu-primary",
+        "runtime_id": "runtime_hermes",
+        "skills": [
+          "feishu.receive",
+          "task.dispatch",
+          "status.query"
+        ],
+        "source": "default"
+      },
+      "persona_id": "persona_hermes_feishu_primary",
+      "responsibility": "接收用户任务，拆解、路由、汇总团队结果。",
+      "role": "primary",
+      "runtime": {
+        "command": "hermes",
+        "connection_type": "cli",
+        "health": "unknown",
+        "id": "runtime_hermes",
+        "installed": false,
+        "kind": "hermes",
+        "name": "Hermes",
+        "notes": "负责飞书、CLI 等外部渠道入口，以及与 Agent Mesh MCP/Skill 的任务派发。"
+      }
     }
   },
   "offices": {
@@ -58,6 +149,126 @@
       "name": "test",
       "paused": false,
       "updated_at": "2026-06-10T06:19:22.758Z"
+    },
+    "office_本地开发办公室_1781664688208": {
+      "channels": [
+        {
+          "enabled": true,
+          "id": "office_本地开发办公室_1781664688208_channel_chat",
+          "name": "Agent Mesh Chat",
+          "office_id": "office_本地开发办公室_1781664688208",
+          "permission_policy_id": "policy_local_safe_dev",
+          "primary_member_id": "office_本地开发办公室_1781664688208_primary",
+          "type": "agent-mesh-chat"
+        }
+      ],
+      "context_dir": ".agent-mesh/offices/office_本地开发办公室_1781664688208",
+      "created_at": "2026-06-17T02:51:28.208Z",
+      "default_channel_id": "office_本地开发办公室_1781664688208_channel_chat",
+      "default_permission_policy_id": "policy_local_safe_dev",
+      "default_routing_policy_id": "routing_office_本地开发办公室_1781664688208_default",
+      "default_task_type_id": "task_type_office_本地开发办公室_1781664688208_default",
+      "default_workspace_path": ".",
+      "description": "用于本机代码、文档和长期任务协作的办公室。",
+      "event_log_path": ".agent-mesh/offices/office_本地开发办公室_1781664688208/events.jsonl",
+      "id": "office_本地开发办公室_1781664688208",
+      "members": [
+        {
+          "enabled": true,
+          "id": "office_本地开发办公室_1781664688208_member_1",
+          "office_id": "office_本地开发办公室_1781664688208",
+          "office_title": "协作 Agent",
+          "persona": {
+            "capabilities": [
+              "code.implement",
+              "code.review",
+              "repo.inspect"
+            ],
+            "description": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
+            "enabled": true,
+            "id": "persona_claude_code_default",
+            "mcp_bindings": [
+              "mcp_agent_mesh"
+            ],
+            "name": "default",
+            "profile_key": "default",
+            "runtime_id": "runtime_claude_code",
+            "skills": [
+              "code.implement",
+              "code.review",
+              "repo.inspect"
+            ],
+            "source": "default"
+          },
+          "persona_id": "persona_claude_code_default",
+          "responsibility": "Claude Code 默认 CLI 身份，适合实现、审查和仓库分析。",
+          "role": "collaborator",
+          "runtime": {
+            "command": "claude.cmd",
+            "connection_type": "cli",
+            "health": "unknown",
+            "id": "runtime_claude_code",
+            "installed": false,
+            "kind": "claude-code",
+            "name": "Claude Code",
+            "notes": "适合代码实现、仓库分析、审查与长任务执行。"
+          }
+        },
+        {
+          "enabled": true,
+          "id": "office_本地开发办公室_1781664688208_primary",
+          "office_id": "office_本地开发办公室_1781664688208",
+          "office_title": "Captain / 主 Agent",
+          "persona": {
+            "capabilities": [
+              "channel.feishu",
+              "task.request",
+              "mcp.client"
+            ],
+            "description": "面向飞书入口的 Hermes profile，用于接收远程任务和回传进度。",
+            "enabled": true,
+            "id": "persona_hermes_feishu_primary",
+            "mcp_bindings": [
+              "mcp_agent_mesh"
+            ],
+            "name": "feishu-primary",
+            "profile_key": "feishu-primary",
+            "runtime_id": "runtime_hermes",
+            "skills": [
+              "feishu.receive",
+              "task.dispatch",
+              "status.query"
+            ],
+            "source": "default"
+          },
+          "persona_id": "persona_hermes_feishu_primary",
+          "responsibility": "接收用户任务，拆解、路由、汇总团队结果。",
+          "role": "primary",
+          "runtime": {
+            "command": "hermes",
+            "connection_type": "cli",
+            "health": "unknown",
+            "id": "runtime_hermes",
+            "installed": false,
+            "kind": "hermes",
+            "name": "Hermes",
+            "notes": "负责飞书、CLI 等外部渠道入口，以及与 Agent Mesh MCP/Skill 的任务派发。"
+          }
+        }
+      ],
+      "name": "test2",
+      "paused": false,
+      "project_context": {
+        "description": "用于本机代码、文档和长期任务协作的办公室。",
+        "key_docs": [],
+        "name": "本地开发办公室",
+        "repo_paths": [
+          "."
+        ],
+        "tags": []
+      },
+      "team_file_path": ".agent-mesh/offices/office_本地开发办公室_1781664688208/team.json",
+      "updated_at": "2026-06-17T02:51:50.508Z"
     }
   },
   "permissionPolicies": {
@@ -249,6 +460,19 @@
       ],
       "strategy": "capability-match",
       "task_type_id": "task_type_office_test_1781072362758_readonly_repo_inspect"
+    },
+    "routing_office_本地开发办公室_1781664688208_default": {
+      "enabled": true,
+      "fallback_member_id": "office_本地开发办公室_1781664688208_member_1",
+      "id": "routing_office_本地开发办公室_1781664688208_default",
+      "name": "AI 推荐路由",
+      "office_id": "office_本地开发办公室_1781664688208",
+      "preferred_member_ids": [
+        "office_本地开发办公室_1781664688208_member_1"
+      ],
+      "required_capabilities": [],
+      "strategy": "capability-match",
+      "task_type_id": "task_type_office_本地开发办公室_1781664688208_default"
     }
   },
   "runtimes": {
@@ -383,6 +607,21 @@
       "required_capabilities": [
         "repo.inspect"
       ]
+    },
+    "task_type_office_本地开发办公室_1781664688208_default": {
+      "default_acceptance": [
+        "说明执行结论",
+        "列出关键发现",
+        "标明风险和后续建议"
+      ],
+      "default_constraints": [
+        "遵守办公室权限策略"
+      ],
+      "description": "从统一入口创建的可观测办公室任务。",
+      "enabled": true,
+      "id": "task_type_office_本地开发办公室_1781664688208_default",
+      "name": "默认协作任务",
+      "required_capabilities": []
     },
     "task_type_plan_docs": {
       "default_acceptance": [

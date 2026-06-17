@@ -1,6 +1,10 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { OfficeEvent } from "./types.js";
+import { officeEventsPath } from "./state.js";
 import { safeFileName } from "./state.js";
+
+const OFFICE_EVENT_LIMIT = 1000;
 
 export async function appendTaskEvent(
   stateDir: string,
@@ -65,6 +69,39 @@ export async function readTaskLogTail(
   };
 }
 
+export async function appendOfficeEvent(
+  stateDir: string,
+  officeId: string,
+  event: OfficeEvent
+): Promise<string> {
+  const filePath = officeEventsPath(stateDir, officeId);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const existing = await readFile(filePath, "utf8").catch(() => "");
+  const lines = existing
+    .split(/\r?\n/)
+    .filter(Boolean);
+  lines.push(JSON.stringify(event));
+  const trimmed = lines.slice(-OFFICE_EVENT_LIMIT);
+  await appendOfficeEventSnapshot(filePath, trimmed);
+  return filePath;
+}
+
+export async function readOfficeEvents(stateDir: string, officeId: string, limit = 20) {
+  const filePath = officeEventsPath(stateDir, officeId);
+  const content = await readFile(filePath, "utf8").catch(() => "");
+  const events = content
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => safeJson(line))
+    .filter(Boolean) as OfficeEvent[];
+
+  return {
+    officeId,
+    events: events.slice(-limit),
+    eventsFile: filePath
+  };
+}
+
 export function taskArtifactPath(stateDir: string, taskId: string, fileName: string): string {
   return path.resolve(stateDir, "tasks", safeFileName(taskId), fileName);
 }
@@ -77,3 +114,7 @@ function safeJson(line: string): Record<string, unknown> | null {
   }
 }
 
+async function appendOfficeEventSnapshot(filePath: string, lines: string[]): Promise<void> {
+  const next = lines.length > 0 ? `${lines.join("\n")}\n` : "";
+  await writeFile(filePath, next, "utf8");
+}

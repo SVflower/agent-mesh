@@ -42,10 +42,24 @@ export const OfficeSchema = z.object({
   default_task_type_id: z.string().optional(),
   default_routing_policy_id: z.string().optional(),
   default_workspace_path: z.string().optional(),
+  context_dir: z.string().optional(),
+  team_file_path: z.string().optional(),
+  event_log_path: z.string().optional(),
+  project_context: z
+    .object({
+      name: z.string().optional(),
+      description: z.string().optional(),
+      repo_paths: z.array(z.string()).default([]),
+      key_docs: z.array(z.string()).default([]),
+      tags: z.array(z.string()).default([])
+    })
+    .optional(),
   paused: z.boolean().default(false),
   created_at: z.string().optional(),
   updated_at: z.string().optional()
 });
+
+export const OfficeMemberHealthSchema = z.enum(["unknown", "online", "offline", "busy"]);
 
 // OfficeMember 表示某个 Persona 加入某个办公室后的角色，是办公室内部的成员关系。
 export const OfficeMemberSchema = z.object({
@@ -55,7 +69,40 @@ export const OfficeMemberSchema = z.object({
   role: z.enum(["primary", "collaborator", "reviewer", "observer"]),
   office_title: z.string().min(1),
   responsibility: z.string().optional(),
-  enabled: z.boolean().default(true)
+  enabled: z.boolean().default(true),
+  can_be_captain: z.boolean().default(true),
+  health: OfficeMemberHealthSchema.default("unknown"),
+  last_active_at: z.string().optional()
+});
+
+export const OfficeCaptainStateSchema = z.object({
+  office_id: z.string().min(1),
+  current_captain_member_id: z.string().min(1),
+  promoted_at: z.string().min(1),
+  promoted_by: z.enum(["channel_entry", "self_upgrade", "manual", "system"]),
+  source_channel_id: z.string().optional(),
+  previous_captain_member_id: z.string().optional()
+});
+
+export const OfficeEventSchema = z.object({
+  id: z.string().min(1),
+  office_id: z.string().min(1),
+  type: z.enum([
+    "captain_promoted",
+    "member_joined",
+    "member_left",
+    "task_assigned",
+    "task_completed",
+    "task_failed",
+    "progress_report",
+    "broadcast",
+    "context_updated"
+  ]),
+  from_member_id: z.string().optional(),
+  to_member_id: z.string().optional(),
+  message: z.string().optional(),
+  data: z.record(z.unknown()).default({}),
+  created_at: z.string().min(1)
 });
 
 export const ChannelSchema = z.object({
@@ -217,7 +264,10 @@ export type RuntimeHealth = z.infer<typeof RuntimeHealthSchema>;
 export type Runtime = z.infer<typeof RuntimeSchema>;
 export type Persona = z.infer<typeof PersonaSchema>;
 export type Office = z.infer<typeof OfficeSchema>;
+export type OfficeMemberHealth = z.infer<typeof OfficeMemberHealthSchema>;
 export type OfficeMember = z.infer<typeof OfficeMemberSchema>;
+export type OfficeCaptainState = z.infer<typeof OfficeCaptainStateSchema>;
+export type OfficeEvent = z.infer<typeof OfficeEventSchema>;
 export type Channel = z.infer<typeof ChannelSchema>;
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type TaskResult = z.infer<typeof TaskResultSchema>;

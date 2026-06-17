@@ -18,6 +18,7 @@ const defaultConfig: AgentMeshConfig = {
 }
 
 export type RuntimeScanState = 'idle' | 'scanning' | 'failed'
+export type BootstrapState = 'loading' | 'ready' | 'error'
 
 // 负责桌面端启动时的配置加载与 Runtime 扫描，页面只消费结果和刷新动作。
 export function useAgentMeshBootstrap() {
@@ -28,6 +29,8 @@ export function useAgentMeshBootstrap() {
   const [adapterStatuses, setAdapterStatuses] = useState<RuntimeAdapterStatus[]>([])
   const [scanState, setScanState] = useState<RuntimeScanState>('idle')
   const [scanError, setScanError] = useState<string | null>(null)
+  const [bootstrapState, setBootstrapState] = useState<BootstrapState>('loading')
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null)
 
   async function refreshConfig() {
     const [nextConfig, nextPersonas, nextOffices, nextAdapterStatuses] = await Promise.all([
@@ -56,12 +59,39 @@ export function useAgentMeshBootstrap() {
   }
 
   useEffect(() => {
-    void refreshConfig().catch((error) => setScanError(error instanceof Error ? error.message : String(error)))
-    void rescanRuntimes()
+    let cancelled = false
+
+    async function bootstrap() {
+      setBootstrapState('loading')
+      setBootstrapError(null)
+
+      const [configResult] = await Promise.allSettled([
+        refreshConfig(),
+        rescanRuntimes(),
+      ])
+
+      if (cancelled) return
+
+      if (configResult.status === 'rejected') {
+        setBootstrapError(configResult.reason instanceof Error ? configResult.reason.message : String(configResult.reason))
+        setBootstrapState('error')
+        return
+      }
+
+      setBootstrapState('ready')
+    }
+
+    void bootstrap()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return {
     adapterStatuses,
+    bootstrapError,
+    bootstrapState,
     config,
     offices,
     personas,

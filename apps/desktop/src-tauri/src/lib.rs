@@ -11,6 +11,8 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const OFFICE_EVENT_LIMIT: usize = 1000;
+
 #[derive(Serialize)]
 struct AppStatus {
     name: &'static str,
@@ -492,6 +494,12 @@ fn list_offices() -> Result<Vec<Value>, String> {
 #[tauri::command]
 fn save_office(payload: SaveOfficePayload) -> Result<Value, String> {
     let mut config = read_config()?;
+    let office_id = payload
+        .office
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "office.id is required".to_string())?
+        .to_string();
 
     upsert_named_value(&mut config, "offices", &payload.office)?;
     for member in &payload.members {
@@ -507,7 +515,24 @@ fn save_office(payload: SaveOfficePayload) -> Result<Value, String> {
         upsert_named_value(&mut config, "routingPolicies", routing_policy)?;
     }
 
+    let runtime_created = ensure_office_runtime(&mut config, &office_id)?;
     write_config(&config)?;
+    write_office_team_snapshot(&config, &office_id)?;
+    write_office_context_snapshot(&config, &office_id)?;
+    append_office_event(
+        &office_id,
+        serde_json::json!({
+          "id": format!("office_event_{}", current_timestamp_millis()),
+          "office_id": office_id,
+          "type": "context_updated",
+          "message": if runtime_created { "Office runtime initialized" } else { "Office runtime synced" },
+          "data": {
+            "source": "save_office",
+            "initialized": runtime_created
+          },
+          "created_at": iso_timestamp()
+        }),
+    )?;
     Ok(config)
 }
 
@@ -581,6 +606,7 @@ fn delete_office(office_id: String) -> Result<Value, String> {
     }
 
     write_config(&config)?;
+    delete_office_runtime(&office_id)?;
     Ok(config)
 }
 
@@ -2436,6 +2462,327 @@ fn task_summary_from_value(value: &Value, path: &Path) -> TaskSummary {
     }
 }
 
+fn office_relative_root(office_id: &str) -> String {
+    format!(".agent-mesh/offices/{office_id}")
+}
+
+fn office_runtime_root(office_id: &str) -> Result<PathBuf, String> {
+    Ok(workspace_root()?.join(".agent-mesh").join("offices").join(office_id))
+}
+
+fn office_team_path(office_id: &str) -> Result<PathBuf, String> {
+    Ok(office_runtime_root(office_id)?.join("team.json"))
+}
+
+fn office_context_path(office_id: &str) -> Result<PathBuf, String> {
+    Ok(office_runtime_root(office_id)?.join("context.json"))
+}
+
+fn office_events_path(office_id: &str) -> Result<PathBuf, String> {
+    Ok(office_runtime_root(office_id)?.join("events.jsonl"))
+}
+
+fn ensure_office_runtime(config: &mut Value, office_id: &str) -> Result<bool, String> {
+    let runtime_root = office_runtime_root(office_id)?;
+    let runtime_created = !runtime_root.exists();
+    fs::create_dir_all(runtime_root.join("tasks")).map_err(|error| error.to_string())?;
+
+    let team_path = office_team_path(office_id)?;
+    if !team_path.exists() {
+        write_pretty_json_file(
+            &team_path,
+            &serde_json::json!({
+              "office_id": office_id,
+              "current_captain": Value::Null,
+              "members": [],
+              "updated_at": iso_timestamp()
+            }),
+        )?;
+    }
+
+    let context_path = office_context_path(office_id)?;
+    if !context_path.exists() {
+        write_pretty_json_file(
+            &context_path,
+            &serde_json::json!({
+              "office_id": office_id,
+              "project_context": {}
+            }),
+        )?;
+    }
+
+    let events_path = office_events_path(office_id)?;
+    if !events_path.exists() {
+        fs::write(&events_path, "").map_err(|error| error.to_string())?;
+    }
+
+    update_office_runtime_fields(config, office_id)?;
+    Ok(runtime_created)
+}
+
+fn update_office_runtime_fields(config: &mut Value, office_id: &str) -> Result<(), String> {
+    let offices = config
+        .get_mut("offices")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "config.offices is missing".to_string())?;
+    let office = offices
+        .get_mut(office_id)
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| format!("office {office_id} was not found"))?;
+
+    let relative_root = office_relative_root(office_id);
+    office.insert(
+        "context_dir".to_string(),
+        Value::String(relative_root.clone()),
+    );
+    office.insert(
+        "team_file_path".to_string(),
+        Value::String(format!("{relative_root}/team.json")),
+    );
+    office.insert(
+        "event_log_path".to_string(),
+        Value::String(format!("{relative_root}/events.jsonl")),
+    );
+    if !office.contains_key("project_context") {
+        let office_name = office
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let office_description = office
+            .get("description")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let repo_paths = office
+            .get("default_workspace_path")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(|value| vec![Value::String(value.to_string())])
+            .unwrap_or_default();
+        office.insert(
+            "project_context".to_string(),
+            serde_json::json!({
+              "name": office_name,
+              "description": office_description,
+              "repo_paths": repo_paths,
+              "key_docs": [],
+              "tags": []
+            }),
+        );
+    }
+
+    Ok(())
+}
+
+fn write_office_team_snapshot(config: &Value, office_id: &str) -> Result<(), String> {
+    let members_map = config
+        .get("officeMembers")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let personas = config
+        .get("personas")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let runtimes = config
+        .get("runtimes")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut members = members_map
+        .values()
+        .filter(|member| member.get("office_id").and_then(Value::as_str) == Some(office_id))
+        .cloned()
+        .collect::<Vec<_>>();
+    members.sort_by_key(|member| {
+        member
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string()
+    });
+
+    let current_captain = resolve_office_captain_state(office_id, &members)?;
+    let member_rows = members
+        .iter()
+        .map(|member| {
+            let persona_id = member
+                .get("persona_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let persona = personas.get(persona_id).cloned().unwrap_or(Value::Null);
+            let runtime_id = persona
+                .get("runtime_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let runtime = runtimes.get(runtime_id).cloned().unwrap_or(Value::Null);
+            serde_json::json!({
+              "member_id": member.get("id").and_then(Value::as_str),
+              "persona_id": member.get("persona_id").and_then(Value::as_str),
+              "persona_name": persona.get("name").and_then(Value::as_str),
+              "runtime_id": runtime.get("id").and_then(Value::as_str),
+              "runtime_kind": runtime.get("kind").and_then(Value::as_str),
+              "role": member.get("role").and_then(Value::as_str),
+              "office_title": member.get("office_title").and_then(Value::as_str),
+              "responsibility": member.get("responsibility").and_then(Value::as_str),
+              "enabled": member.get("enabled").and_then(Value::as_bool).unwrap_or(true),
+              "can_be_captain": member.get("can_be_captain").and_then(Value::as_bool).unwrap_or(true),
+              "health": member.get("health").and_then(Value::as_str).unwrap_or("unknown"),
+              "last_active_at": member.get("last_active_at").and_then(Value::as_str)
+            })
+        })
+        .collect::<Vec<_>>();
+
+    write_pretty_json_file(
+        &office_team_path(office_id)?,
+        &serde_json::json!({
+          "office_id": office_id,
+          "current_captain": current_captain,
+          "members": member_rows,
+          "updated_at": iso_timestamp()
+        }),
+    )
+}
+
+fn resolve_office_captain_state(office_id: &str, members: &[Value]) -> Result<Value, String> {
+    if let Some(existing) = load_existing_office_captain_state(office_id)? {
+        let existing_member_id = existing
+            .get("current_captain_member_id")
+            .and_then(Value::as_str);
+        let still_valid = existing_member_id.is_some_and(|member_id| {
+            members.iter().any(|member| {
+                member.get("id").and_then(Value::as_str) == Some(member_id)
+                    && member
+                        .get("can_be_captain")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(true)
+                    && member.get("enabled").and_then(Value::as_bool).unwrap_or(true)
+            })
+        });
+        if still_valid {
+            return Ok(existing);
+        }
+    }
+
+    let fallback = members
+        .iter()
+        .find(|member| {
+            member.get("role").and_then(Value::as_str) == Some("primary")
+                && member
+                    .get("can_be_captain")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+                && member.get("enabled").and_then(Value::as_bool).unwrap_or(true)
+        })
+        .or_else(|| {
+            members.iter().find(|member| {
+                member
+                    .get("can_be_captain")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+                    && member.get("enabled").and_then(Value::as_bool).unwrap_or(true)
+            })
+        });
+
+    Ok(fallback
+        .map(|member| {
+            serde_json::json!({
+              "office_id": office_id,
+              "current_captain_member_id": member.get("id").and_then(Value::as_str),
+              "promoted_at": iso_timestamp(),
+              "promoted_by": "system"
+            })
+        })
+        .unwrap_or(Value::Null))
+}
+
+fn load_existing_office_captain_state(office_id: &str) -> Result<Option<Value>, String> {
+    let team_path = office_team_path(office_id)?;
+    if !team_path.exists() {
+        return Ok(None);
+    }
+    let team = read_json_file(&team_path)?;
+    Ok(team.get("current_captain").cloned().filter(|value| !value.is_null()))
+}
+
+fn write_office_context_snapshot(config: &Value, office_id: &str) -> Result<(), String> {
+    let office = config
+        .get("offices")
+        .and_then(Value::as_object)
+        .and_then(|offices| offices.get(office_id))
+        .cloned()
+        .ok_or_else(|| format!("office {office_id} was not found"))?;
+    let project_context = office
+        .get("project_context")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    write_pretty_json_file(
+        &office_context_path(office_id)?,
+        &serde_json::json!({
+          "office_id": office_id,
+          "name": office.get("name").and_then(Value::as_str),
+          "description": office.get("description").and_then(Value::as_str),
+          "default_workspace_path": office.get("default_workspace_path").and_then(Value::as_str),
+          "project_context": project_context,
+          "updated_at": iso_timestamp()
+        }),
+    )
+}
+
+fn append_office_event(office_id: &str, event: Value) -> Result<(), String> {
+    append_limited_jsonl(&office_events_path(office_id)?, &event, OFFICE_EVENT_LIMIT)
+}
+
+fn append_limited_jsonl(path: &Path, entry: &Value, limit: usize) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let mut lines = if path.exists() {
+        fs::read_to_string(path)
+            .map_err(|error| error.to_string())?
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    lines.push(serde_json::to_string(entry).map_err(|error| error.to_string())?);
+    if lines.len() > limit {
+        lines = lines.split_off(lines.len() - limit);
+    }
+    let content = if lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", lines.join("\n"))
+    };
+    fs::write(path, content).map_err(|error| error.to_string())
+}
+
+fn delete_office_runtime(office_id: &str) -> Result<(), String> {
+    let runtime_root = office_runtime_root(office_id)?;
+    if runtime_root.exists() {
+        fs::remove_dir_all(runtime_root).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn write_pretty_json_file(path: &Path, value: &Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::write(
+        path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(value).map_err(|error| error.to_string())?
+        ),
+    )
+    .map_err(|error| error.to_string())
+}
+
 fn read_json_file(path: &Path) -> Result<Value, String> {
     let content =
         fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -3346,6 +3693,128 @@ mod tests {
         let workspace = resolve_task_workspace(&config, "office_test", root);
 
         assert_eq!(workspace, PathBuf::from("D:\\IDEA\\workspace\\agent-mesh"));
+    }
+
+    #[test]
+    fn ensure_office_runtime_populates_paths_and_team_snapshot() {
+        let office_id = format!("office_runtime_test_{}", current_timestamp_millis());
+        let mut config = serde_json::json!({
+          "offices": {},
+          "officeMembers": {
+            "member_primary": {
+              "id": "member_primary",
+              "office_id": office_id.clone(),
+              "persona_id": "persona_claude",
+              "role": "primary",
+              "office_title": "Captain",
+              "enabled": true
+            }
+          },
+          "personas": {
+            "persona_claude": {
+              "id": "persona_claude",
+              "runtime_id": "runtime_claude",
+              "name": "default"
+            }
+          },
+          "runtimes": {
+            "runtime_claude": {
+              "id": "runtime_claude",
+              "kind": "claude-code",
+              "name": "Claude Code"
+            }
+          }
+        });
+        config
+            .get_mut("offices")
+            .and_then(Value::as_object_mut)
+            .expect("offices should be object")
+            .insert(
+                office_id.clone(),
+                serde_json::json!({
+                  "id": office_id.clone(),
+                  "name": "runtime test",
+                  "description": "test office",
+                  "default_workspace_path": "D:\\IDEA\\workspace\\agent-mesh"
+                }),
+            );
+
+        ensure_office_runtime(&mut config, &office_id).expect("runtime should initialize");
+        write_office_team_snapshot(&config, &office_id).expect("team snapshot should write");
+        write_office_context_snapshot(&config, &office_id).expect("context snapshot should write");
+
+        let office = config
+            .get("offices")
+            .and_then(Value::as_object)
+            .and_then(|offices| offices.get(&office_id))
+            .expect("office should exist");
+        let expected_context_dir = format!(".agent-mesh/offices/{office_id}");
+        assert_eq!(
+            office.get("context_dir").and_then(Value::as_str),
+            Some(expected_context_dir.as_str())
+        );
+
+        let team = read_json_file(&office_team_path(&office_id).expect("team path should resolve"))
+            .expect("team snapshot should be readable");
+        assert_eq!(
+            team.get("current_captain")
+                .and_then(|value| value.get("current_captain_member_id"))
+                .and_then(Value::as_str),
+            Some("member_primary")
+        );
+
+        let context = read_json_file(
+            &office_context_path(&office_id).expect("context path should resolve"),
+        )
+        .expect("context snapshot should be readable");
+        assert_eq!(
+            context.get("project_context").and_then(|value| value.get("repo_paths")),
+            Some(&serde_json::json!(["D:\\IDEA\\workspace\\agent-mesh"]))
+        );
+
+        delete_office_runtime(&office_id).expect("runtime directory should be removed");
+    }
+
+    #[test]
+    fn office_events_keep_latest_thousand_entries() {
+        let office_id = format!("office_events_test_{}", current_timestamp_millis());
+        let mut config = serde_json::json!({ "offices": {} });
+        config
+            .get_mut("offices")
+            .and_then(Value::as_object_mut)
+            .expect("offices should be object")
+            .insert(
+                office_id.clone(),
+                serde_json::json!({
+                  "id": office_id.clone(),
+                  "name": "events test"
+                }),
+            );
+
+        ensure_office_runtime(&mut config, &office_id).expect("runtime should initialize");
+        for index in 0..1005 {
+            append_office_event(
+                &office_id,
+                serde_json::json!({
+                  "id": format!("event_{index}"),
+                  "office_id": office_id.clone(),
+                  "type": "context_updated",
+                  "created_at": iso_timestamp()
+                }),
+            )
+            .expect("event should append");
+        }
+
+        let lines = fs::read_to_string(office_events_path(&office_id).expect("events path"))
+            .expect("events log should exist")
+            .lines()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        assert_eq!(lines.len(), 1000);
+        assert!(lines[0].contains("\"event_5\""));
+        assert!(lines[999].contains("\"event_1004\""));
+
+        delete_office_runtime(&office_id).expect("runtime directory should be removed");
     }
 
     #[test]

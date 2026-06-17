@@ -20,6 +20,11 @@ describe("mcp server", () => {
       "get_task_events",
       "get_node_status",
       "get_office_status",
+      "get_my_team",
+      "get_office_context",
+      "upgrade_to_captain",
+      "report_to_office",
+      "broadcast_to_team",
       "get_task_log_tail",
       "get_agent_session_status",
       "reset_agent_session"
